@@ -466,15 +466,7 @@ router.put("/reject-offer", async (req, res) => {
 
 
 
-// Fetch All Offers
-// router.get("/fetch-offers", async (req, res) => {
-//     try {
-//       const offers = await Offer.find();
-//       res.status(200).json({ message: "Offers fetched successfully!", data: offers });
-//     } catch (error) {
-//       res.status(500).json({ message: "Error fetching offers", error });
-//     }
-//   });
+
   
   // Fetch Single Offer by ID
   router.get("/fetch-offer/:id", async (req, res) => {

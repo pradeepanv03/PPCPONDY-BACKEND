@@ -41,27 +41,24 @@ const upload = multer({
 });
 
 
-// Fetch all photo requests
-router.get("/photo-request", async (req, res) => {
+router.get("/photo-requests", async (req, res) => {
   try {
-    const photoRequests = await PhotoRequest.find();
-    res.status(200).json({ success: true, data: photoRequests });
+    const photoRequests = await PhotoRequest.find().lean();
+    res.status(200).json({ success: true, message: "Photo requests fetched successfully.", data: photoRequests });
   } catch (error) {
-    res.status(500).json({ success: false, message: "Error fetching photo requests", error: error.message });
+    res.status(500).json({ success: false, message: "Internal Server Error", error: error.message });
   }
 });
 
-// Get all properties
+// ✅ Fetch All Properties
 router.get("/properties", async (req, res) => {
   try {
-    const properties = await AddModel.find(); // Fetch all properties from DB
-    res.status(200).json({ success: true, data: properties });
+    const properties = await AddModel.find().lean();
+    res.status(200).json({ success: true, message: "Properties fetched successfully.", data: properties });
   } catch (error) {
-    res.status(500).json({ success: false, message: "Error fetching properties", error: error.message });
+    res.status(500).json({ success: false, message: "Internal Server Error", error: error.message });
   }
 });
-
-
 
 
 
@@ -307,6 +304,66 @@ router.get("/photo-requests/buyer/:phoneNumber", async (req, res) => {
 
 
 
+
+
+
+
+
+
+// ✅ Fetch Photo Request Count for an Owner
+router.get("/photo-requests/owner/count/:phoneNumber", async (req, res) => {
+  try {
+      let phoneNumber = req.params.phoneNumber.replace(/\D/g, ""); // Remove non-numeric characters
+
+      if (phoneNumber.startsWith("91") && phoneNumber.length === 12) {
+          phoneNumber = phoneNumber.slice(2); // Convert '917878789090' → '7878789090'
+      }
+
+
+      // Count photo requests received by the property owner
+      const photoRequestCount = await PhotoRequest.countDocuments({
+          $or: [
+              { postedUserPhoneNumber: phoneNumber },
+              { postedUserPhoneNumber: `+91${phoneNumber}` },
+              { postedUserPhoneNumber: `91${phoneNumber}` }
+          ]
+      });
+
+
+      return res.status(200).json({ photoRequestCount });
+
+  } catch (error) {
+      return res.status(500).json({ message: "Internal Server Error", error: error.message });
+  }
+});
+
+
+// ✅ Fetch Photo Requests Count
+router.get("/photo-requests/buyer/count/:phoneNumber", async (req, res) => {
+  try {
+      let phoneNumber = req.params.phoneNumber.replace(/\D/g, ""); // Remove non-numeric characters
+
+      if (phoneNumber.startsWith("91") && phoneNumber.length === 12) {
+          phoneNumber = phoneNumber.slice(2); // Convert '917878789090' → '7878789090'
+      }
+
+      // Count photo requests received by the property owner
+      const photoRequestsCount = await PhotoRequest.countDocuments({
+          $or: [
+              { postedUserPhoneNumber: phoneNumber },
+              { postedUserPhoneNumber: `+91${phoneNumber}` },
+              { postedUserPhoneNumber: `91${phoneNumber}` }
+          ]
+      });
+
+      return res.status(200).json({ photoRequestsCount });
+
+  } catch (error) {
+      return res.status(500).json({ message: "Internal Server Error", error: error.message });
+  }
+});
+
+
 router.get("/property/:ppcId", async (req, res) => {
   try {
     const { ppcId } = req.params;
@@ -501,6 +558,7 @@ router.put("/photo-requests/delete/:ppcId", async (req, res) => {
 });
 
 
+
 router.put("/photo-requests/delete/:ppcId/:phoneNumber", async (req, res) => {
   try {
       const { ppcId, phoneNumber } = req.params;
@@ -600,6 +658,7 @@ router.put("/photo-requests/reject/:ppcId", async (req, res) => {
 });
 
 
+
 router.put("/reject-photo-request", async (req, res) => {
     try {
         const { ppcId, requesterPhoneNumber } = req.body;
@@ -635,6 +694,7 @@ router.put("/reject-photo-request", async (req, res) => {
         res.status(500).json({ message: "Internal Server Error", error: error.message });
     }
 });
+
 
 
 router.put("/accept-photo-request", async (req, res) => {
@@ -711,7 +771,6 @@ router.put("/accept-photorequest", async (req, res) => {
       });
 
   } catch (error) {
-      console.error("Error updating photo request:", error);
       res.status(500).json({ message: "Internal Server Error", error: error.message });
   }
 });
@@ -730,7 +789,6 @@ router.put("/photos/edit/:id", async (req, res) => {
 
     res.status(200).json({ message: "Photo request updated successfully.", request });
   } catch (error) {
-    console.error("Error updating photo request:", error);
     res.status(500).json({ message: "Error updating photo request.", error: error.message });
   }
 });

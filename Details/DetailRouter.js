@@ -2240,9 +2240,7 @@ router.put("/interest/delete/:ppcId/:phoneNumber", async (req, res) => {
         return res.status(404).json({ message: "Property not found." });
       }
   
-    //   if (!property.previousStatus) {
-    //     return res.status(400).json({ message: "No previous status found to restore." });
-    //   }
+
   
       // Restore the interest request if it was deleted
       if (!property.interestRequests.some((req) => req.phoneNumber === phoneNumber)) {

@@ -58,26 +58,6 @@ router.get("/profile/mobile/:mobile", async (req, res) => {
   });
   
   
-//   // Update Profile by Mobile Number
-//   router.put("/profile/:mobile", async (req, res) => {
-//     try {
-//       const { name, email, mobile, address } = req.body;
-//       const updatedProfile = await ProfileData.findOneAndUpdate(
-//         { mobile: req.params.mobile },
-//         { name, email, mobile, address },
-//         { new: true }
-//       );
-  
-//       if (!updatedProfile) return res.status(404).json({ message: "Profile not found" });
-  
-//       res.json({ message: "Profile updated successfully", ProfileData: updatedProfile });
-//     } catch (error) {
-//       res.status(500).json({ message: "Error updating profile", error });
-//     }
-//   });
-  
-
-// 🟢 Update Profile by Mobile Number
 router.put("/profile/:mobile", async (req, res) => {
     try {
       const { name, email, address } = req.body;

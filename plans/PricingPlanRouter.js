@@ -4,6 +4,42 @@ const PricingPlans = require('../plans/PricingPlanModel');
 const AddModel = require('../AddModel');
 
 
+// Normalize phone number function
+const normalizePhoneNumber = (phoneNumber) => {
+    return phoneNumber.replace(/^\+?91/, ""); // Convert +91XXXXXX or 91XXXXXX to XXXXXX
+};
+
+// ✅ Get all plans for a specific phone number
+router.get("/plans/:phoneNumber", async (req, res) => {
+    try {
+        let { phoneNumber } = req.params;
+        phoneNumber = normalizePhoneNumber(phoneNumber);
+
+        const plans = await PricingPlans.find({ phoneNumber });
+        if (plans.length === 0) {
+            return res.status(404).json({ message: "No plans found for this phone number." });
+        }
+
+        return res.status(200).json({ success: true, plans });
+    } catch (error) {
+        return res.status(500).json({ message: "Error fetching plans.", error: error.message });
+    }
+});
+
+// ✅ Get plan count for a specific phone number
+router.get("/plans/count/:phoneNumber", async (req, res) => {
+    try {
+        let { phoneNumber } = req.params;
+        phoneNumber = normalizePhoneNumber(phoneNumber);
+
+        const count = await PricingPlans.countDocuments({ phoneNumber });
+
+        return res.status(200).json({ success: true, count });
+    } catch (error) {
+        return res.status(500).json({ message: "Error fetching plan count.", error: error.message });
+    }
+});
+
 
 
 router.get('/get-plan', async (req, res) => {
@@ -14,6 +50,21 @@ router.get('/get-plan', async (req, res) => {
         return res.status(500).json({ message: 'Error fetching plans.', error: error.message });
     }
 });
+
+
+router.get('/get-all-plan-count', async (req, res) => {
+    try {
+        const plans = await PricingPlans.find(); // Fetch all plans
+
+        // Extract unique plan names
+        const uniquePlanNames = new Set(plans.map(plan => plan.name));
+
+        return res.status(200).json({ totalPlansCount: uniquePlanNames.size });
+    } catch (error) {
+        return res.status(500).json({ message: 'Error fetching plans count.', error: error.message });
+    }
+});
+
 
 router.get('/get-all-plan', async (req, res) => {
     try {
@@ -69,8 +120,48 @@ router.post('/store-plan', async (req, res) => {
     }
 });
 
+router.post("/select-plan", async (req, res) => {
+    const { phoneNumber, planId } = req.body;
 
+    try {
+        // Check if the user already has an active plan
+        const existingPlan = await PricingPlans.findOne({ phoneNumber });
 
+        if (existingPlan) {
+            return res.status(400).json({
+                status: "error",
+                message: "You already have an active plan!",
+            });
+        }
+
+        // Find the plan by ID
+        const selectedPlan = await PricingPlans.findById(planId);
+
+        if (!selectedPlan) {
+            return res.status(404).json({
+                status: "error",
+                message: "Plan not found!",
+            });
+        }
+
+        // Assign the plan to the user
+        selectedPlan.phoneNumber = phoneNumber;
+        await selectedPlan.save();
+
+        return res.status(200).json({
+            status: "success",
+            message: "Plan selected successfully!",
+            selectedPlan,
+        });
+
+    } catch (error) {
+        return res.status(500).json({
+            status: "error",
+            message: "Error selecting plan.",
+            error: error.message,
+        });
+    }
+});
 
 
 router.get('/plans', async (req, res) => {
@@ -112,61 +203,33 @@ router.get('/plans/:id', async (req, res) => {
 
 
 
-router.post("/register-plan", async (req, res) => {
-    const { 
-        name, packageType, unlimitedAds, price, durationDays, numOfCars, 
-        featuredAds, featuredMaxCar, description, status, phoneNumber  
-    } = req.body;
 
+router.get('/get-active-plans', async (req, res) => {
     try {
-        // Check if the user already has an active plan
-        const existingPlan = await PricingPlans.findOne({ phoneNumber }).sort({ createdAt: -1 });
-
-        if (existingPlan) {
-            // Calculate expiration date
-            const planExpirationDate = new Date(existingPlan.createdAt);
-            planExpirationDate.setDate(planExpirationDate.getDate() + existingPlan.durationDays);
-
-            if (planExpirationDate > new Date()) {
-                return res.status(200).json({
-                    status: "info",
-                    message: "You already have an active plan. Please wait until it expires.",
-                    existingPlan
-                });
-            }
-        }
-
-        // If no active plan or expired, create a new one
-        const userPlan = new PricingPlans({
-            name,
-            packageType,
-            unlimitedAds,
-            price,
-            durationDays,
-            numOfCars,
-            featuredAds,
-            featuredMaxCar,
-            description,
-            status,
-            phoneNumber,
-            createdAt: new Date() // Ensure createdAt is set
-        });
-
-        await userPlan.save();
-
-        return res.status(201).json({
-            status: "success",
-            message: "Plan added successfully!",
-            userPlan
-        });
+        const activePlans = await PricingPlans.find({ status: 'active' });
+        return res.status(200).json(activePlans);
     } catch (error) {
-        return res.status(500).json({
-            status: "error",
-            message: "Error storing plan details.",
-            error: error.message
-        });
+        return res.status(500).json({ message: 'Error fetching active plans.', error: error.message });
     }
 });
+
+
+router.get('/get-latest-active-plan/:phoneNumber', async (req, res) => {
+    const { phoneNumber } = req.params;
+
+    try {
+        const latestPlan = await PricingPlans.findOne({ phoneNumber, status: 'active' }).sort({ createdAt: -1 });
+
+        if (!latestPlan) {
+            return res.status(404).json({ message: 'No active plan found for this user.' });
+        }
+
+        return res.status(200).json(latestPlan);
+    } catch (error) {
+        return res.status(500).json({ message: 'Error fetching latest active plan.', error: error.message });
+    }
+});
+
 
 
 
@@ -257,6 +320,7 @@ router.get('/get-new-plan', async (req, res) => {
             phoneNumber = phoneNumber.slice(2); // Convert '917878789090' → '787878789090'
         }
 
+        console.log("Normalized phone number for query:", phoneNumber);
 
         // Fetch plans with multiple matching formats
         const plans = await PricingPlans.find({

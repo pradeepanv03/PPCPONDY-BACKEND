@@ -27,6 +27,7 @@ const PhotoRequestRouter = require ('./Photo/PhotoRequestRouter')
 const ProfileRouter = require ('./MyProfile/ProfileRouter')
 const ContactUsRouter =require('./ContactUs/ContactUsRouter');
 const TextRouter = require ('./TextEdider/TextRouter')
+const NotificationRouter = require ('./Notification/NotificationRouter')
 
 
 
@@ -100,6 +101,7 @@ app.use('/PPC', PhotoRequestRouter)
 app.use('/PPC',ProfileRouter);
 app.use('/PPC',ContactUsRouter);
 app.use('/PPC', TextRouter)
+app.use('/PPC', NotificationRouter)
 
 // 404 Error Handling Middleware
 app.use((req, res, next) => {
