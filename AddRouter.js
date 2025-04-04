@@ -1,4 +1,5 @@
 
+
 const express = require('express');
 const router = express.Router();
 const AddModel = require('./AddModel');
@@ -367,7 +368,6 @@ router.get("/property-owner-viewed-users", async (req, res) => {
 
 
 
-// ✅ Undo Soft Delete (Restore Property)
 router.put("/undo-delete-view", async (req, res) => {
   const { ppcId, phoneNumber } = req.body;
 
@@ -774,33 +774,42 @@ router.get("/property-buyer-viewed-count", async (req, res) => {
   }
 });
 
+
+
 router.get('/get-interest-owner-count', async (req, res) => {
-  const { phoneNumber } = req.query;  
+  const { phoneNumber } = req.query;
 
   if (!phoneNumber) {
-      return res.status(400).json({ success: false, message: 'Phone number is required.' });
+    return res.status(400).json({ success: false, message: 'Phone number is required.' });
   }
 
   try {
-      // Find properties where the phoneNumber exists in the interestRequests list
-      const properties = await AddModel.find({
-          'interestRequests.phoneNumber': phoneNumber
-      });
+    // Find all properties where this buyer's phone number appears in interestRequests
+    const properties = await AddModel.find({
+      'interestRequests.phoneNumber': { $regex: phoneNumber.replace(/\s/g, ""), $options: "i" }
+    });
 
-      if (properties.length === 0) {
-          return res.status(200).json({ success: true, interestOwnersCount: 0 });
-      }
+    if (!properties.length) {
+      return res.status(200).json({ success: true, interestOwnersCount: 0 });
+    }
 
-      // Extract unique property owners from the filtered properties
-      const uniqueOwners = new Set(properties.map(property => property.phoneNumber));
+    // Extract unique property owners (postedUserPhoneNumber)
+    const uniqueOwnerPhones = new Set(properties.map(p => p.postedUserPhoneNumber));
 
-      return res.status(200).json({ success: true, interestOwnersCount: uniqueOwners.size });
+    return res.status(200).json({
+      success: true,
+      interestOwnersCount: uniqueOwnerPhones.size,
+      owners: Array.from(uniqueOwnerPhones) // Optional: Return list of unique owners
+    });
 
   } catch (error) {
-      return res.status(500).json({ success: false, message: 'Internal Server Error', error: error.message });
+    return res.status(500).json({
+      success: false,
+      message: 'Internal Server Error',
+      error: error.message
+    });
   }
 });
-
 
 
 router.get('/get-help-as-buyer-count', async (req, res) => {
@@ -883,60 +892,84 @@ router.get('/get-contact-buyer-count', async (req, res) => {
 });
 
 router.get('/get-help-as-owner-count', async (req, res) => {
-  const { phoneNumber } = req.query;  
+  const { phoneNumber } = req.query;
 
   if (!phoneNumber) {
-      return res.status(400).json({ success: false, message: 'Phone number is required.' });
+    return res.status(400).json({ success: false, message: 'Phone number is required.' });
   }
 
   try {
-      // Find properties where the phoneNumber exists in the helpRequests list
-      const properties = await AddModel.find({
-          'helpRequests.phoneNumber': phoneNumber
-      });
+    const cleanPhone = phoneNumber.trim().replace(/[^+\d]/g, ''); // Normalize phone number
 
-      if (properties.length === 0) {
-          return res.status(200).json({ success: true, helpOwnersCount: 0 });
+    // Find properties where helpRequests contain the target phone number
+    const properties = await AddModel.find({
+      'helpRequests.phoneNumber': {
+        $regex: cleanPhone,
+        $options: 'i'
       }
+    });
 
-      // Extract unique property owners from the filtered properties
-      const uniqueOwners = new Set(properties.map(property => property.phoneNumber));
+    if (!properties.length) {
+      return res.status(200).json({ success: true, helpOwnersCount: 0 });
+    }
 
-      return res.status(200).json({ success: true, helpOwnersCount: uniqueOwners.size });
+    // Extract unique posted user phone numbers (owners)
+    const uniqueOwners = new Set(properties.map(p => p.phoneNumber || p.postedUserPhoneNumber));
+
+    return res.status(200).json({
+      success: true,
+      helpOwnersCount: uniqueOwners.size,
+      owners: Array.from(uniqueOwners) // Optional: return list of owner numbers
+    });
 
   } catch (error) {
-      return res.status(500).json({ success: false, message: 'Internal Server Error', error: error.message });
+    return res.status(500).json({
+      success: false,
+      message: 'Internal Server Error',
+      error: error.message
+    });
   }
 });
-
 
 router.get('/get-contact-owner-count', async (req, res) => {
-  const { phoneNumber } = req.query;  
+  const { phoneNumber } = req.query;
 
   if (!phoneNumber) {
-      return res.status(400).json({ success: false, message: 'Phone number is required.' });
+    return res.status(400).json({ success: false, message: 'Phone number is required.' });
   }
 
   try {
-      // Find properties where the phoneNumber exists in the contactRequests list
-      const properties = await AddModel.find({
-          'contactRequests.phoneNumber': phoneNumber
-      });
+    const cleanPhone = phoneNumber.trim().replace(/[^+\d]/g, ''); // normalize number
 
-      if (properties.length === 0) {
-          return res.status(200).json({ success: true, contactOwnersCount: 0 });
+    // Use regex to match phoneNumber inside nested array of objects
+    const properties = await AddModel.find({
+      'contactRequests.phoneNumber': {
+        $regex: cleanPhone,
+        $options: 'i'
       }
+    });
 
-      // Extract unique property owners from the filtered properties
-      const uniqueOwners = new Set(properties.map(property => property.phoneNumber));
+    if (!properties.length) {
+      return res.status(200).json({ success: true, contactOwnersCount: 0 });
+    }
 
-      return res.status(200).json({ success: true, contactOwnersCount: uniqueOwners.size });
+    // Extract unique owners (postedUserPhoneNumber or phoneNumber)
+    const uniqueOwners = new Set(properties.map(p => p.phoneNumber));
+
+    return res.status(200).json({
+      success: true,
+      contactOwnersCount: uniqueOwners.size,
+      owners: Array.from(uniqueOwners) // Optional
+    });
 
   } catch (error) {
-      return res.status(500).json({ success: false, message: 'Internal Server Error', error: error.message });
+    return res.status(500).json({
+      success: false,
+      message: 'Internal Server Error',
+      error: error.message
+    });
   }
 });
-
 
 // ✅ Fetch Reported Property Requests Count
 router.get('/get-reportproperty-buyer-count', async (req, res) => {
@@ -978,31 +1011,43 @@ router.get('/get-reportproperty-buyer-count', async (req, res) => {
   }
 });
 
-
 router.get('/get-reportproperty-owner-count', async (req, res) => {
-  const { phoneNumber } = req.query;  
+  const { phoneNumber } = req.query;
 
   if (!phoneNumber) {
-      return res.status(400).json({ message: 'Phone number is required.' });
+    return res.status(400).json({ success: false, message: 'Phone number is required.' });
   }
 
   try {
-      // Find properties where the phoneNumber exists in the reportProperty list
-      const properties = await AddModel.find({
-          'reportProperty.phoneNumber': phoneNumber
-      });
+    const cleanPhone = phoneNumber.trim().replace(/[^+\d]/g, ''); // normalize
 
-      if (properties.length === 0) {
-          return res.status(200).json({ reportPropertyOwnersCount: 0 });
+    // Find properties where reportProperty array includes an object with matching phoneNumber
+    const properties = await AddModel.find({
+      'reportProperty.phoneNumber': {
+        $regex: cleanPhone,
+        $options: 'i'
       }
+    });
 
-      // Extract unique property owners from the filtered properties
-      const uniqueOwners = new Set(properties.map(property => property.phoneNumber));
+    if (!properties.length) {
+      return res.status(200).json({ success: true, reportPropertyOwnersCount: 0 });
+    }
 
-      return res.status(200).json({ reportPropertyOwnersCount: uniqueOwners.size });
+    // Get unique owner phone numbers (the property owner's phone number)
+    const uniqueOwners = new Set(properties.map(p => p.phoneNumber));
+
+    return res.status(200).json({
+      success: true,
+      reportPropertyOwnersCount: uniqueOwners.size,
+      owners: Array.from(uniqueOwners) // Optional: helpful for debugging
+    });
 
   } catch (error) {
-      return res.status(500).json({ message: 'Internal Server Error', error: error.message });
+    return res.status(500).json({
+      success: false,
+      message: 'Internal Server Error',
+      error: error.message
+    });
   }
 });
 
@@ -1046,33 +1091,42 @@ router.get('/get-soldout-buyer-count', async (req, res) => {
   }
 });
 
-
 router.get('/get-soldout-owner-count', async (req, res) => {
   const { phoneNumber } = req.query;  
 
   if (!phoneNumber) {
-      return res.status(400).json({ message: 'Phone number is required.' });
+    return res.status(400).json({ success: false, message: 'Phone number is required.' });
   }
 
   try {
-      // Find properties where the phoneNumber exists in the soldOutReport list
-      const properties = await AddModel.find({
-          'soldOutReport.phoneNumber': phoneNumber
-      });
+    const cleanPhone = phoneNumber.trim().replace(/[^+\d]/g, ''); // Normalize phone number
 
-      if (properties.length === 0) {
-          return res.status(200).json({ soldOutOwnersCount: 0 });
+    // Find properties where the soldOutReport array contains the phoneNumber
+    const properties = await AddModel.find({
+      'soldOutReport.phoneNumber': {
+        $regex: cleanPhone,
+        $options: 'i'
       }
+    });
 
-      // Extract unique property owners from the filtered properties
-      const uniqueOwners = new Set(properties.map(property => property.phoneNumber));
+    if (!properties.length) {
+      return res.status(200).json({ success: true, soldOutOwnersCount: 0 });
+    }
 
-      return res.status(200).json({ soldOutOwnersCount: uniqueOwners.size });
+    // Get unique owners (property owners)
+    const uniqueOwners = new Set(properties.map(property => property.phoneNumber));
+
+    return res.status(200).json({
+      success: true,
+      soldOutOwnersCount: uniqueOwners.size,
+      owners: Array.from(uniqueOwners) // optional for debug/inspection
+    });
 
   } catch (error) {
-      return res.status(500).json({ message: 'Internal Server Error', error: error.message });
+    return res.status(500).json({ success: false, message: 'Internal Server Error', error: error.message });
   }
 });
+
 
 
 
@@ -2094,6 +2148,33 @@ router.get('/fetch-status', async (req, res) => {
 
 
 
+
+router.get('/fetch-status-count', async (req, res) => {
+  const { phoneNumber } = req.query;
+
+  if (!phoneNumber) {
+    return res.status(400).json({ message: 'Phone number is required.' });
+  } 
+  try {
+    const normalizedPhoneNumber = phoneNumber
+      .replace(/\s|-/g, '')
+      .replace(/^\+91|91|0/, '')
+      .trim();
+
+    const query = {
+      phoneNumber: new RegExp(normalizedPhoneNumber + '$'),
+      status: { $in: ['incomplete', 'complete'] },
+    };
+
+    const userCount = await AddModel.countDocuments(query);
+
+    res.status(200).json({ message: 'User count fetched successfully!', count: userCount });
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching user count.', error });
+  }
+});
+
+
   
 
 
@@ -2143,6 +2224,38 @@ router.get('/fetch-delete-status', async (req, res) => {
   }
 });
   
+
+router.get('/fetch-delete-status-count', async (req, res) => {
+  const { phoneNumber } = req.query;
+
+  if (!phoneNumber) {
+      return res.status(400).json({ message: 'Phone number is required.' });
+  }
+
+  try {
+      // Normalize phone number format
+      const normalizedPhoneNumber = phoneNumber
+          .replace(/[\s-]/g, '') // Remove spaces & hyphens
+          .replace(/^(\+91|91|0)/, '') // Remove country code if exists
+          .trim();
+
+      const query = {
+          phoneNumber: new RegExp(`^(\\+91)?${normalizedPhoneNumber}$`), 
+          status: 'delete',
+      };
+
+      const userCount = await AddModel.countDocuments(query);
+
+      res.status(200).json({ message: 'Deleted properties count fetched successfully!', count: userCount });
+
+  } catch (error) {
+      res.status(500).json({ 
+          message: 'Error fetching deleted properties count.', 
+          error: error.message || error 
+      });
+  }
+});
+
 
   router.get('/fetch-removed-datas', async (req, res) => {
     const { ppcId } = req.query;
@@ -2246,6 +2359,27 @@ router.get("/fetch-featured-properties", async (req, res) => {
 
 
 module.exports = router;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

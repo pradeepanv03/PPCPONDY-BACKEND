@@ -320,7 +320,6 @@ router.get('/get-new-plan', async (req, res) => {
             phoneNumber = phoneNumber.slice(2); // Convert '917878789090' → '787878789090'
         }
 
-        console.log("Normalized phone number for query:", phoneNumber);
 
         // Fetch plans with multiple matching formats
         const plans = await PricingPlans.find({
