@@ -1,10 +1,11 @@
 
-
 const express = require('express');
 const router = express.Router();
 const AddModel = require('./AddModel');
 const UserViewsModel = require("./ViewsModel");
 const BuyerAssistance = require("./BuyerAssistance/BuyerAssistanceModel");
+const NotificationUser = require('./Notification/NotificationDetailModel');
+
 
 
 const multer = require('multer');
@@ -48,60 +49,8 @@ const upload = multer({
 
 
 
-// Route to share property details based on ppcId
-router.get('/share/:ppcId', async (req, res) => {
-  try {
-    const { ppcId } = req.params;
-    
-    // Find the property by ppcId
-    const property = await AddModel.findOne({ ppcId, isDeleted: false }); // Ensure it's not deleted
-    
-    if (!property) {
-      return res.status(404).json({ message: "Property not found" });
-    }
-
-    // Return the property details
-    const shareData = {
-      ppcId: property.ppcId,
-      price: property.price,
-      propertyMode: property.propertyMode,
-      propertyType: property.propertyType,
-      city: property.city
-    };
-
-    res.json(shareData);
-  } catch (error) {
-    res.status(500).json({ message: "Error fetching property details", error });
-  }
-});
 
 
-router.post('/share-property', async (req, res) => {
-  try {
-    const { platform, shareMessage, phoneNumber } = req.body;
-
-    // Check if ppcId is valid
-    if (!shareMessage.ppcId || isNaN(shareMessage.ppcId)) {
-      return res.status(400).json({ message: 'Invalid PPC ID' });
-    }
-
-    // Send shareMessage to the desired platform
-    let response;
-    if (platform === 'whatsapp') {
-      response = await shareOnWhatsApp(shareMessage);
-    } else if (platform === 'facebook') {
-      response = await shareOnFacebook(shareMessage);
-    } else if (platform === 'twitter') {
-      response = await shareOnTwitter(shareMessage);
-    } else {
-      return res.status(400).json({ message: 'Unsupported platform' });
-    }
-
-    return res.status(200).json({ message: 'Property shared successfully!', response });
-  } catch (error) {
-    return res.status(500).json({ message: 'Error sharing property', error });
-  }
-});
 
 
 
@@ -174,7 +123,7 @@ router.post("/user-viewed-property", async (req, res) => {
       return res.status(400).json({ message: "phoneNumber and ppcId are required" });
     }
 
-    // Normalize phone number (remove spaces and '+')
+    // Normalize phone number
     const normalizedPhoneNumber = phoneNumber.replace(/\s+/g, "").replace(/\+/g, "");
 
     // Check if the property exists
@@ -183,9 +132,9 @@ router.post("/user-viewed-property", async (req, res) => {
       return res.status(404).json({ message: "Property not found" });
     }
 
-    const propertyOwnerPhoneNumber = property.phoneNumber; // Property owner's phone number
+    const propertyOwnerPhoneNumber = property.phoneNumber;
 
-    // ✅ Step 1: Find or create UserViews entry
+    // ✅ Step 1: Record the view in UserViews
     let userViews = await UserViewsModel.findOne({ phoneNumber: normalizedPhoneNumber });
 
     if (!userViews) {
@@ -196,9 +145,7 @@ router.post("/user-viewed-property", async (req, res) => {
         ],
       });
     } else {
-      // Check if the property is already viewed by this user
       const alreadyViewed = userViews.viewedProperties.some((view) => view.ppcId === ppcId);
-
       if (!alreadyViewed) {
         userViews.viewedProperties.push({
           ppcId,
@@ -208,20 +155,29 @@ router.post("/user-viewed-property", async (req, res) => {
       }
     }
 
-    // ✅ Step 2: Save UserViews
     await userViews.save();
 
-    // ✅ Step 3: Increment view count in AddModel
+    // ✅ Step 2: Increment views in AddModel
     await AddModel.updateOne({ ppcId }, { $inc: { views: 1 } });
 
-    res.status(200).json({ message: "Property view recorded successfully" });
+    // ✅ Step 3: Create a notification to the property owner
+    await NotificationUser.create({
+      recipientPhoneNumber: propertyOwnerPhoneNumber,
+      senderPhoneNumber: normalizedPhoneNumber,
+      message: `Your property (ID: ${ppcId}) was viewed by a user.`,
+      ppcId: ppcId,
+      createdAt: new Date(),
+    });
+
+    res.status(200).json({ message: "Property view recorded and notification sent" });
   } catch (error) {
     res.status(500).json({ message: "Internal Server Error", error: error.message });
   }
 });
 
 
-// ✅ API to fetch viewed properties for a user
+
+
 router.get("/user-viewed-properties", async (req, res) => {
   try {
     const { phoneNumber } = req.query;
@@ -418,6 +374,7 @@ router.put("/delete-view-property", async (req, res) => {
     res.status(500).json({ message: "Error removing property.", error: error.message });
   }
 });
+
 
 
 router.get("/property-buyer-viewed", async (req, res) => {
@@ -1819,6 +1776,7 @@ router.get('/fetch-data', async (req, res) => {
 
 
 
+
 router.get('/fetch-all-datas', async (req, res) => {
     try {
 
@@ -1879,18 +1837,30 @@ router.get("/fetch-Pudhucherry-properties", async (req, res) => {
   }
 });
 
+
+
+// Route: GET /fetch-active-users
 router.get('/fetch-active-users', async (req, res) => {
   try {
-      // Fetch users with 'active' or 'delete' status
-      const users = await AddModel.find({ status: { $in: ['active', 'delete','complete', 'contact'] } });
+    // Fetch users with specific statuses
+    const users = await AddModel.find({
+      status: { $in: ['active', 'delete', 'complete', 'contact'] }
+    });
 
-      // Return the fetched user data
-      res.status(200).json({ message: 'Active and deleted users fetched successfully!', users });
+    // Respond with the fetched users
+    res.status(200).json({
+      message: 'Active and related status users fetched successfully!',
+      users
+    });
+
   } catch (error) {
-      res.status(500).json({ message: 'Error fetching users.', error });
+
+    res.status(500).json({
+      message: 'Error fetching users.',
+      error: error.message || 'Unknown server error'
+    });
   }
 });
-
 
 router.get('/fetch-all-complete-data', async (req, res) => {
   try {

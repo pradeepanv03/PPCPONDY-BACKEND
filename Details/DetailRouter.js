@@ -2,9 +2,20 @@ const express = require('express');
 const AddModel = require('../AddModel');
 const DetailSchema = require ('./DetailModel');
 const { updateSearchIndex } = require('../SendDataAdmin/DataModel');
-
+const NotificationUser = require('../Notification/NotificationDetailModel');
 const router = express.Router();
 
+const normalizePhoneNumber = (number) => {
+    if (!number) return "";
+  
+    number = number.replace(/\D/g, ""); // Remove non-digits
+    if (number.length === 10) return "+91" + number;
+    if (number.length === 12 && number.startsWith("91")) return "+" + number;
+    if (number.length === 13 && number.startsWith("+91")) return number;
+  
+    return number; // fallback
+  };
+  
 
 router.post("/send-interests", async (req, res) => {
     const { phoneNumber, ppcId } = req.body;
@@ -16,7 +27,6 @@ router.post("/send-interests", async (req, res) => {
             return res.status(404).json({ message: "Property not found" });
         }
 
-        // Check if the user has already shown interest in this property
         const isAlreadyInterested = property.interestRequests.some(
             (request) => request.phoneNumber === phoneNumber
         );
@@ -29,7 +39,6 @@ router.post("/send-interests", async (req, res) => {
             });
         }
 
-        // Add interest request and update timestamp
         const updatedProperty = await AddModel.findOneAndUpdate(
             { ppcId },
             {
@@ -39,29 +48,170 @@ router.post("/send-interests", async (req, res) => {
             { new: true }
         );
 
+        // ✅ Save notification with error handling
+        try {
+            const notification = await NotificationUser.create({
+                recipientPhoneNumber: updatedProperty.phoneNumber,
+                senderPhoneNumber: phoneNumber,
+                ppcId,
+                message: `One interest has been recorded! Interest sent by user ${phoneNumber}.`,
+                createdAt: new Date()
+            });
+        } catch (notifErr) {
+        }
+
         return res.status(200).json({
             message: "Your interest has been recorded!",
             status: "sendInterest",
             postedUserPhoneNumber: updatedProperty.phoneNumber,
-            ownerName: updatedProperty.ownerName, 
+            ownerName: updatedProperty.ownerName,
             propertyMode: updatedProperty.propertyMode,
             propertyType: updatedProperty.propertyType,
             price: updatedProperty.price,
             area: updatedProperty.area,
-            city:updatedProperty.city,
-            createdAt:updatedProperty.createdAt,
-            updatedAt:updatedProperty.updatedAt,
+            city: updatedProperty.city,
+            createdAt: updatedProperty.createdAt,
+            updatedAt: updatedProperty.updatedAt,
             alreadySaved: updatedProperty.interestRequests.map(req => req.phoneNumber),
             views: updatedProperty.views,
             photos: updatedProperty.photos || []
         });
 
     } catch (error) {
-        return res.status(500).json({ message: "Internal Server Error", error: error.message });
+        return res.status(500).json({
+            message: "Internal Server Error",
+            error: error.message
+        });
     }
 });
 
 
+router.get("/get-user-notifications", async (req, res) => {
+    let { phoneNumber } = req.query;
+  
+    if (!phoneNumber) {
+      return res.status(400).json({ message: "Phone number is required" });
+    }
+  
+    phoneNumber = phoneNumber.replace(/\D/g, ""); // Remove non-digits
+  
+    const variants = [
+      "+91" + phoneNumber.slice(-10),
+      "91" + phoneNumber.slice(-10),
+      phoneNumber.slice(-10)
+    ];
+  
+  
+    try {
+      const notifications = await NotificationUser.find({
+        recipientPhoneNumber: { $in: variants }
+      }).sort({ createdAt: -1 });
+  
+      return res.status(200).json({
+        message: "Notifications fetched successfully",
+        notifications
+      });
+    } catch (error) {
+      return res.status(500).json({ message: "Internal Server Error", error: error.message });
+    }
+  });
+
+  router.put("/mark-notifications-read", async (req, res) => {
+    let { phoneNumber } = req.body;
+  
+    if (!phoneNumber) {
+      return res.status(400).json({ message: "Phone number is required" });
+    }
+  
+    phoneNumber = phoneNumber.replace(/\D/g, "");
+  
+    const variants = [
+      "+91" + phoneNumber.slice(-10),
+      "91" + phoneNumber.slice(-10),
+      phoneNumber.slice(-10),
+    ];
+  
+    try {
+      const result = await NotificationUser.updateMany(
+        {
+          recipientPhoneNumber: { $in: variants },
+          isRead: false,
+        },
+        { $set: { isRead: true } }
+      );
+  
+      return res.status(200).json({
+        message: "Notifications marked as read",
+        modifiedCount: result.modifiedCount,
+      });
+    } catch (error) {
+      return res.status(500).json({ message: "Internal Server Error", error: error.message });
+    }
+  });
+  
+  router.put('/mark-single-notification-read/:id', async (req, res) => {
+    try {
+      const { id } = req.params;
+      await NotificationUser.findByIdAndUpdate(id, { isRead: true });
+      res.status(200).json({ message: "Notification marked as read." });
+    } catch (err) {
+      res.status(500).json({ message: "Error marking notification as read." });
+    }
+  });
+  
+  // DELETE /delete-notification/:id
+router.delete('/delete-notification/:id', async (req, res) => {
+    try {
+      const { id } = req.params;
+  
+      // Validate MongoDB ObjectId
+   
+      const deletedNotification = await NotificationUser.findByIdAndDelete(id);
+  
+      if (!deletedNotification) {
+        return res.status(404).json({ message: "Notification not found." });
+      }
+  
+      res.status(200).json({ message: "Notification deleted successfully." });
+    } catch (error) {
+      res.status(500).json({ message: "Error deleting notification.", error: error.message });
+    }
+  });
+  
+
+  
+
+
+  router.get("/notification-user-count", async (req, res) => {
+    let { phoneNumber } = req.query;
+  
+    if (!phoneNumber) {
+      return res.status(400).json({ message: "Phone number is required" });
+    }
+  
+    phoneNumber = phoneNumber.replace(/\D/g, ""); // Normalize phone number
+  
+    const variants = [
+      "+91" + phoneNumber.slice(-10),
+      "91" + phoneNumber.slice(-10),
+      phoneNumber.slice(-10)
+    ];
+  
+    try {
+      const count = await NotificationUser.countDocuments({
+        recipientPhoneNumber: { $in: variants }
+      });
+  
+      return res.status(200).json({
+        message: "Notification count fetched successfully",
+        count
+      });
+    } catch (error) {
+      return res.status(500).json({ message: "Internal Server Error", error: error.message });
+    }
+  });
+  
+  
 
 router.get('/get-interest-owner', async (req, res) => {
     try {
@@ -336,22 +486,18 @@ router.get('/get-all-owners-and-buyers', async (req, res) => {
 
 
 
-// ******* Need Help ********
-
-
-
-
 router.post('/need-help', async (req, res) => {
     const { phoneNumber, ppcId } = req.body;
 
     try {
+        // Step 1: Check if the property exists
         const property = await AddModel.findOne({ ppcId });
 
         if (!property) {
             return res.status(404).json({ message: 'Property not found' });
         }
 
-        // Check if the phone number has already requested help for this property
+        // Step 2: Check if help was already requested by this phone number
         const isAlreadyInterested = property.helpRequests.some(
             (request) => request.phoneNumber === phoneNumber
         );
@@ -364,36 +510,52 @@ router.post('/need-help', async (req, res) => {
             });
         }
 
-        // Add the new help request
+        // Step 3: Add the new help request
         const updatedProperty = await AddModel.findOneAndUpdate(
             { ppcId },
             { 
-                $push: { helpRequests: { phoneNumber } }, // Store the requesting phone number
+                $push: { helpRequests: { phoneNumber } },
                 $set: { updatedAt: Date.now() }
             },
-            { new: true } // Return the updated document
+            { new: true }
         );
 
+        // ✅ Step 4: Save a notification for the property owner
+        try {
+            const notification = await NotificationUser.create({
+                recipientPhoneNumber: updatedProperty.phoneNumber,  // Owner
+                senderPhoneNumber: phoneNumber,                     // Requesting user
+                ppcId,
+                message: `User ${phoneNumber} requested help for your property.`,
+                createdAt: new Date()
+            });
+        } catch (notifErr) {
+        }
+
+        // Step 5: Send response with updated property info
         return res.status(200).json({
             message: 'Your help request has been recorded!',
             status: 'needHelp',
-            postedUserPhoneNumber: updatedProperty.phoneNumber, // Owner's phone number
-            ownerName: updatedProperty.ownerName, 
+            postedUserPhoneNumber: updatedProperty.phoneNumber,
+            ownerName: updatedProperty.ownerName,
             propertyMode: updatedProperty.propertyMode,
             propertyType: updatedProperty.propertyType,
             price: updatedProperty.price,
             area: updatedProperty.area,
-            city:updatedProperty.city,
-            createdAt:updatedProperty.createdAt,
-            updatedAt:updatedProperty.updatedAt,
-            views: updatedProperty.views, // Current views count
+            city: updatedProperty.city,
+            createdAt: updatedProperty.createdAt,
+            updatedAt: updatedProperty.updatedAt,
+            views: updatedProperty.views,
             status: updatedProperty.status,
-            photos: updatedProperty.photos || [],  
-            helpRequestedUserPhoneNumbers: updatedProperty.helpRequests.map(req => req.phoneNumber) // List of help request numbers
+            photos: updatedProperty.photos || [],
+            helpRequestedUserPhoneNumbers: updatedProperty.helpRequests.map(req => req.phoneNumber)
         });
 
     } catch (error) {
-        return res.status(500).json({ message: 'Internal Server Error', error: error.message });
+        return res.status(500).json({
+            message: 'Internal Server Error',
+            error: error.message
+        });
     }
 });
 
@@ -592,8 +754,6 @@ router.delete('/delete-help/:ppcId', async (req, res) => {
 });
 
 
-// ********* Contact ***********
-
 router.post('/contact', async (req, res) => {
     const { phoneNumber, ppcId } = req.body;
 
@@ -606,16 +766,11 @@ router.post('/contact', async (req, res) => {
         }
 
         const postedUserPhoneNumber = property.phoneNumber;
-        const propertyMode = property.propertyMode;
-        const propertyType = property.propertyType;
-        const price = property.price;
-        const area = property.area;
-        const email = property.email;
-        const bestTimeToCall = property.bestTimeToCall;
-        const ownerName = property.ownerName;
-        const status = property.status;
-        const photos = property.photos || [];
-        
+        const {
+            propertyMode, propertyType, price, area, email,
+            bestTimeToCall, ownerName, status, photos = []
+        } = property;
+
         if (!postedUserPhoneNumber) {
             return res.status(404).json({ success: false, message: 'Phone number not found for the property owner.' });
         }
@@ -632,7 +787,7 @@ router.post('/contact', async (req, res) => {
             });
         }
 
-        // Add the phone number to the contactRequests array and update other fields
+        // Add contact request and update property
         const updatedProperty = await AddModel.findOneAndUpdate(
             { ppcId },
             {
@@ -640,11 +795,23 @@ router.post('/contact', async (req, res) => {
                 $set: { status: 'contact', updatedAt: new Date() },
                 $inc: { views: 1 }
             },
-            { new: true } // Return the updated document
+            { new: true }
         );
 
         if (!updatedProperty) {
             return res.status(500).json({ success: false, message: 'Failed to update contact requests.' });
+        }
+
+        // ✅ Send Notification to Property Owner
+        try {
+            const contactNotification = await NotificationUser.create({
+                recipientPhoneNumber: updatedProperty.phoneNumber,  // Owner
+                senderPhoneNumber: phoneNumber,                    // Contacting user
+                ppcId,
+                message: `User ${phoneNumber} requested contact for your property.`,
+                createdAt: new Date()
+            });
+        } catch (notifErr) {
         }
 
         return res.status(200).json({
@@ -662,7 +829,7 @@ router.post('/contact', async (req, res) => {
             status: updatedProperty.status,
             photos,
             views: updatedProperty.views,
-            contactRequests: updatedProperty.contactRequests, // Send updated contactRequests array
+            contactRequests: updatedProperty.contactRequests,
             createdAt: new Date(),
             updatedAt: new Date()
         });
@@ -907,11 +1074,6 @@ router.delete('/delete-contact/:ppcId', async (req, res) => {
 
 
 
-
-// **************** Report Property **************
-
-
-
 router.post('/report-property', async (req, res) => {
     const { phoneNumber, ppcId, reportReason } = req.body;
 
@@ -922,7 +1084,7 @@ router.post('/report-property', async (req, res) => {
             return res.status(404).json({ message: 'Property not found' });
         }
 
-        // Check if the phone number has already reported this property
+        // Check if already reported
         const isAlreadyReported = property.reportProperty.some(
             (request) => request.phoneNumber === phoneNumber
         );
@@ -931,45 +1093,58 @@ router.post('/report-property', async (req, res) => {
             return res.status(400).json({
                 message: "You have already reported this property.",
                 status: "alreadyReported",
-                reportedNumbers: property.reportProperty.map(req => req.phoneNumber), // Show existing reported numbers
+                reportedNumbers: property.reportProperty.map(req => req.phoneNumber),
             });
         }
 
-        // Update the property with the new report request
+        // Add new report entry
         const updatedProperty = await AddModel.findOneAndUpdate(
             { ppcId },
-            { 
+            {
                 $push: { reportProperty: { phoneNumber, reportReason, createdAt: new Date() } },
                 $set: { updatedAt: new Date() }
             },
-            { new: true } // Return updated document
+            { new: true }
         );
+
+        // ✅ Send Notification to Property Owner
+        try {
+            const reportNotification = await NotificationUser.create({
+                recipientPhoneNumber: updatedProperty.phoneNumber, // Owner
+                senderPhoneNumber: phoneNumber,                   // Reporting user
+                ppcId,
+                message: `User ${phoneNumber} reported your property.`,
+                createdAt: new Date()
+            });
+        } catch (notifErr) {
+        }
 
         return res.status(200).json({
             message: 'Your report has been recorded!',
             status: 'reportProperties',
             postedUserPhoneNumber: updatedProperty.phoneNumber,
-            ownerName: updatedProperty.ownerName, 
+            ownerName: updatedProperty.ownerName,
             propertyMode: updatedProperty.propertyMode,
             propertyType: updatedProperty.propertyType,
             price: updatedProperty.price,
             area: updatedProperty.area,
-            city:updatedProperty.city,
-            createdAt:updatedProperty.createdAt,
-            updatedAt:updatedProperty.updatedAt,
+            city: updatedProperty.city,
+            createdAt: updatedProperty.createdAt,
+            updatedAt: updatedProperty.updatedAt,
             views: updatedProperty.views,
             status: updatedProperty.status,
             photos: updatedProperty.photos || [],
-            reportedNumbers: updatedProperty.reportProperty.map(req => ({ 
-                phoneNumber: req.phoneNumber, 
-                reportReason: req.reportReason 
-            })) // Return all reported numbers and reasons
+            reportedNumbers: updatedProperty.reportProperty.map(req => ({
+                phoneNumber: req.phoneNumber,
+                reportReason: req.reportReason
+            }))
         });
 
     } catch (error) {
         return res.status(500).json({ message: 'Internal Server Error', error: error.message });
     }
 });
+
 
 
 router.get('/get-reportproperty-buyer', async (req, res) => {
@@ -1213,9 +1388,6 @@ router.delete('/delete-report/:ppcId', async (req, res) => {
 
 
 
-// **************Sold Out **********
-
-
 router.post('/report-sold-out', async (req, res) => {
     const { phoneNumber, ppcId } = req.body;
 
@@ -1226,7 +1398,7 @@ router.post('/report-sold-out', async (req, res) => {
             return res.status(404).json({ message: 'Property not found' });
         }
 
-        // Check if the phone number has already reported the property as sold out
+        // Check if already reported as sold out
         const isAlreadyReported = property.soldOutReport.some(
             (request) => request.phoneNumber === phoneNumber
         );
@@ -1235,19 +1407,31 @@ router.post('/report-sold-out', async (req, res) => {
             return res.status(400).json({
                 message: "You have already marked this property as sold out.",
                 status: "alreadyReported",
-                reportedNumbers: property.soldOutReport.map(req => req.phoneNumber), // List of reported numbers
+                reportedNumbers: property.soldOutReport.map(req => req.phoneNumber),
             });
         }
 
-        // Update the property with the new sold-out report
+        // Update the property status and add report entry
         const updatedProperty = await AddModel.findOneAndUpdate(
             { ppcId },
-            { 
-                $push: { soldOutReport: { phoneNumber, createdAt: new Date() } },  
+            {
+                $push: { soldOutReport: { phoneNumber, createdAt: new Date() } },
                 $set: { status: 'soldOut', updatedAt: new Date() }
             },
-            { new: true } // Return updated document
+            { new: true }
         );
+
+        // ✅ Send Notification to Property Owner
+        try {
+            const soldOutNotification = await NotificationUser.create({
+                recipientPhoneNumber: updatedProperty.phoneNumber, // Owner
+                senderPhoneNumber: phoneNumber,                   // Reporting user
+                ppcId,
+                message: `User ${phoneNumber} reported your property as sold out.`,
+                createdAt: new Date()
+            });
+        } catch (notifErr) {
+        }
 
         return res.status(200).json({
             message: 'The property has been marked as sold out.',
@@ -1258,15 +1442,15 @@ router.post('/report-sold-out', async (req, res) => {
             price: updatedProperty.price,
             area: updatedProperty.area,
             ownerName: updatedProperty.ownerName,
-            views: updatedProperty.views, 
-            city:updatedProperty.city,
-            updatedAt:updatedProperty.updatedAt,
-            createdAt:updatedProperty.createdAt,
-            photos: updatedProperty.photos || [],  
+            views: updatedProperty.views,
+            city: updatedProperty.city,
+            updatedAt: updatedProperty.updatedAt,
+            createdAt: updatedProperty.createdAt,
+            photos: updatedProperty.photos || [],
             reportedNumbers: updatedProperty.soldOutReport.map(req => ({
                 phoneNumber: req.phoneNumber,
                 reportedAt: req.createdAt
-            })) // Returning all reported phone numbers
+            }))
         });
 
     } catch (error) {
@@ -1528,6 +1712,8 @@ router.delete('/delete-soldout/:ppcId', async (req, res) => {
 });
 
 
+
+
 router.post("/add-favorite", async (req, res) => {
     const { phoneNumber, ppcId } = req.body;
 
@@ -1542,8 +1728,19 @@ router.post("/add-favorite", async (req, res) => {
             return res.status(404).json({ message: "Property not found" });
         }
 
-        // Use schema method to add favorite request
         await property.addFavoriteRequest(phoneNumber);
+
+        // ✅ Notification to owner
+        try {
+            await NotificationUser.create({
+                recipientPhoneNumber: property.phoneNumber,
+                senderPhoneNumber: phoneNumber,
+                ppcId,
+                message: `User ${phoneNumber} added your property to favorites.`,
+                createdAt: new Date()
+            });
+        } catch (notifErr) {
+        }
 
         return res.status(200).json({
             message: "Property added to your favorites!",
@@ -1563,13 +1760,14 @@ router.post("/add-favorite", async (req, res) => {
                 phoneNumber: fav.phoneNumber,
                 favoritedAt: fav.date
             })),
+            readStatus: "Unread"
         });
     } catch (error) {
         return res.status(500).json({ message: "Internal Server Error", error: error.message });
     }
 });
 
-// Remove from Favorites
+
 router.post("/remove-favorite", async (req, res) => {
     const { phoneNumber, ppcId } = req.body;
 
@@ -1584,8 +1782,19 @@ router.post("/remove-favorite", async (req, res) => {
             return res.status(404).json({ message: "Property not found" });
         }
 
-        // Use schema method to remove favorite request
         await property.removeFavoriteRequest(phoneNumber);
+
+        // ✅ Notification to owner
+        try {
+            await NotificationUser.create({
+                recipientPhoneNumber: property.phoneNumber,
+                senderPhoneNumber: phoneNumber,
+                ppcId,
+                message: `User ${phoneNumber} removed your property from favorites.`,
+                createdAt: new Date()
+            });
+        } catch (notifErr) {
+        }
 
         return res.status(200).json({
             message: "Property removed from your favorites!",
@@ -1603,14 +1812,14 @@ router.post("/remove-favorite", async (req, res) => {
             favoriteRemoved: property.favoriteRemoved.map(fav => ({
                 phoneNumber: fav.phoneNumber,
                 removedAt: fav.removedAt
-            })),
+            }))
         });
     } catch (error) {
         return res.status(500).json({ message: "Internal Server Error", error: error.message });
     }
 });
 
-// Get Favorite Added & Removed Data
+
 router.get("/favorite-history/:phoneNumber", async (req, res) => {
     const { phoneNumber } = req.params;
 
@@ -1877,25 +2086,6 @@ router.put("/favoriteRemoved/undo/:ppcId/:favoriteUserPhone", async (req, res) =
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// ---------------
-
-// Get properties that a specific user has favorited
 router.get('/get-favorite-owner', async (req, res) => {
     try {
         const { phoneNumber } = req.query; // Extract phoneNumber from query parameters
@@ -1918,26 +2108,28 @@ router.get('/get-favorite-owner', async (req, res) => {
             ppcId: property.ppcId,
             postedUserPhoneNumber: property.phoneNumber, // Property owner's phone number
             favoritedUserPhoneNumbers: property.favoriteRequests.map((fav) => fav.phoneNumber), // List of users who favorited
-            propertyMode:property.propertyMode,
-            propertyType:property.propertyType,
-            area:property.area,
-            city:property.city,
-            createdAt:property.createdAt,
-            updatedAt:property.updatedAt,
-            price:property.price,
-            status: property.status  ,
+            propertyMode: property.propertyMode,
+            propertyType: property.propertyType,
+            area: property.area,
+            city: property.city,
+            createdAt: property.createdAt,
+            updatedAt: property.updatedAt,
+            price: property.price,
+            status: property.status,
             photos: property.photos || [],  
         }));
 
         return res.status(200).json({
             message: "Favorite requests fetched successfully.",
-            favoriteRequestsData: favoriteRequestsData || []  // Ensuring it’s never undefined
+            favoriteCount: favoriteRequestsData.length, // ✅ Return the count
+            favoriteRequestsData: favoriteRequestsData || [] // Ensuring it’s never undefined
         });
         
     } catch (error) {
         return res.status(500).json({ message: "Internal Server Error", error: error.message });
     }
 });
+
 
 
 router.get("/get-favorite-buyer", async (req, res) => {
@@ -2240,7 +2432,9 @@ router.put("/interest/delete/:ppcId/:phoneNumber", async (req, res) => {
         return res.status(404).json({ message: "Property not found." });
       }
   
-
+    //   if (!property.previousStatus) {
+    //     return res.status(400).json({ message: "No previous status found to restore." });
+    //   }
   
       // Restore the interest request if it was deleted
       if (!property.interestRequests.some((req) => req.phoneNumber === phoneNumber)) {

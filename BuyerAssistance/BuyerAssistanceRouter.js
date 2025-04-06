@@ -1,10 +1,9 @@
 
-
-
 const express = require("express");
 const router = express.Router();
 const BuyerAssistance = require("../BuyerAssistance/BuyerAssistanceModel");
 const AddModel = require('../AddModel');
+const NotificationUser = require('../Notification/NotificationDetailModel');
 
 
 router.get("/matched-properties-by-phone/:phoneNumber", async (req, res) => {
@@ -115,8 +114,6 @@ router.get("/get-buyer-id/:phoneNumber", async (req, res) => {
 
 
 
-
-
 router.post("/add-buyerAssistance", async (req, res) => {
   try {
     const { phoneNumber } = req.body;
@@ -153,6 +150,16 @@ router.post("/add-buyerAssistance", async (req, res) => {
     });
 
     await newRequest.save();
+
+    // ✅ Create notification (assume admin/support team uses "admin" as phone number)
+    await NotificationUser.create({
+      recipientPhoneNumber: "admin", // Could be a group inbox, admin panel, or even dynamic
+      senderPhoneNumber: formattedPhoneNumber,
+      message: `New buyer assistance request submitted by ${formattedPhoneNumber}`,
+      ppcId: null, // Not linked to a specific property
+      createdAt: new Date(),
+    });
+
     res.status(201).json({ 
       message: "Buyer Assistance request added successfully!", 
       data: newRequest 
@@ -162,7 +169,6 @@ router.post("/add-buyerAssistance", async (req, res) => {
     res.status(500).json({ message: "Error adding Buyer Assistance request", error });
   }
 });
-
 
 
 
@@ -237,7 +243,6 @@ router.get("/fetch-matching-property", async (req, res) => {
       area: area,
       facing: facing,
       price: { $gte: parseInt(minPrice), $lte: parseInt(maxPrice) }, // Convert price range to numbers
-      // status: { $in: ["active", "incomplete"] }, // Allow "incomplete" properties
     };
 
 
@@ -372,7 +377,6 @@ router.get("/fetch-buyer-matched-properties-by-phone", async (req, res) => {
 
 
 
-
 router.get("/fetch-buyer-matched-properties", async (req, res) => {
   try {
     let { phoneNumber } = req.query;
@@ -482,8 +486,7 @@ router.get("/fetch-owner-matched-properties", async (req, res) => {
     let matchedProperties = [];
 
     for (let buyerRequest of buyerRequests) {
-
-
+  
       // Fetch Owner-Matched Properties
       const properties = await AddModel.find({
         propertyMode: buyerRequest.propertyMode,
@@ -535,7 +538,7 @@ router.get("/fetch-owner-matched-properties/count", async (req, res) => {
     let matchedPropertyCount = 0;
 
     for (let buyerRequest of buyerRequests) {
-   
+ 
 
       // Count Owner-Matched Properties
       const count = await AddModel.countDocuments({
@@ -817,9 +820,23 @@ router.delete("/permanent-delete-buyer-assistance/:id", async (req, res) => {
 
 
 
-
-
 module.exports = router;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

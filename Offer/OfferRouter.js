@@ -3,6 +3,7 @@ const express = require('express');
 const router = express.Router();
 const Offer = require('../Offer/OfferModel'); 
 const AddModel = require('../AddModel');
+const NotificationUser = require('../Notification/NotificationDetailModel');
 
 
 router.get("/offers/owner/:phoneNumber", async (req, res) => {
@@ -63,6 +64,32 @@ router.get("/offers/owner/:phoneNumber", async (req, res) => {
     }
 });
 
+// ✅ Fetch Offer Count for an Owner Based on Buyer's Phone Number
+router.get("/offers/owner/count/:phoneNumber", async (req, res) => {
+    try {
+        let { phoneNumber } = req.params;
+
+        // Normalize phone number format (remove non-numeric characters)
+        phoneNumber = phoneNumber.replace(/\D/g, "");
+
+        const phoneVariants = [
+            phoneNumber,
+            `${phoneNumber}`,
+            `+${phoneNumber}`
+        ];
+
+
+        // Count all offers made by the buyer
+        const offerCount = await Offer.countDocuments({ phoneNumber: { $in: phoneVariants } });
+
+
+        return res.status(200).json({ offerCount });
+
+    } catch (error) {
+        return res.status(500).json({ message: "Error fetching offer count.", error: error.message });
+    }
+});
+
 
 router.post('/offer', async (req, res) => {
     try {
@@ -77,39 +104,64 @@ router.post('/offer', async (req, res) => {
             return res.status(400).json({ message: "Invalid price. It must be a positive number." });
         }
 
-        // Fetch property details
         const property = await AddModel.findOne({ ppcId });
         if (!property) {
             return res.status(404).json({ message: "Property not found" });
         }
 
+        const ownerPhone = property.phoneNumber;
+        const originalPrice = property.price;
 
-        // Check if an offer already exists from the same buyer
         let existingOffer = await Offer.findOne({ ppcId, phoneNumber });
 
         if (existingOffer) {
-            // Update existing offer
             existingOffer.price = numericPrice;
-            existingOffer.originalPrice = property.price; // Store original price
-            existingOffer.postedUserPhoneNumber = property.phoneNumber; // Store property owner phone
+            existingOffer.originalPrice = originalPrice;
+            existingOffer.postedUserPhoneNumber = ownerPhone;
             await existingOffer.save();
-            return res.status(200).json({ 
-                message: "Offer updated successfully", 
+
+            // ✅ Notification: Offer Updated
+            try {
+                await NotificationUser.create({
+                    recipientPhoneNumber: ownerPhone,
+                    senderPhoneNumber: phoneNumber,
+                    ppcId,
+                    message: `User ${phoneNumber} updated their offer to ₹${numericPrice} for your property.`,
+                    createdAt: new Date()
+                });
+            } catch (notifErr) {
+            }
+
+            return res.status(200).json({
+                message: "Offer updated successfully",
                 offer: existingOffer
             });
         }
 
-        // Create a new offer and store property details
+        // Create new offer
         const newOffer = new Offer({
             ppcId,
             phoneNumber,
             price: numericPrice,
-            status: 'pending', // Offer status
-            originalPrice: property.price, // Store property price
-            postedUserPhoneNumber: property.phoneNumber // Store property owner phone
+            status: 'pending',
+            originalPrice,
+            postedUserPhoneNumber: ownerPhone
         });
 
         await newOffer.save();
+
+        // ✅ Notification: New Offer
+        try {
+            await NotificationUser.create({
+                recipientPhoneNumber: ownerPhone,
+                senderPhoneNumber: phoneNumber,
+                ppcId,
+                message: `User ${phoneNumber} made a new offer of ₹${numericPrice} for your property.`,
+                createdAt: new Date()
+            });
+        } catch (notifErr) {
+        }
+
         res.status(201).json({
             message: "Offer created successfully",
             offer: newOffer
@@ -119,6 +171,7 @@ router.post('/offer', async (req, res) => {
         res.status(500).json({ message: "Error processing offer", error: error.message });
     }
 });
+
 
 
 router.get('/offers', async (req, res) => {
@@ -163,7 +216,6 @@ router.get('/all-offers', async (req, res) => {
         res.status(500).json({ message: "Error fetching offers", error: error.message });
     }
 });
-
 
 
 /** 🏠 GET ALL OFFERS RECEIVED BY AN OWNER (MULTIPLE BUYERS, MULTIPLE PROPERTIES) **/
@@ -220,6 +272,45 @@ router.get('/offers/buyer/:phoneNumber', async (req, res) => {
         res.status(500).json({ message: "Error fetching owner offers.", error: error.message });
     }
 });
+
+
+// ✅ Fetch Offers Count for a Property Owner
+router.get('/offers/buyer/count/:phoneNumber', async (req, res) => {
+    try {
+        let { phoneNumber } = req.params;
+
+        // Normalize phone number format (removes non-numeric characters)
+        phoneNumber = phoneNumber.replace(/\D/g, "");
+        if (phoneNumber.startsWith("91") && phoneNumber.length === 12) {
+            phoneNumber = phoneNumber.slice(2);
+        }
+
+        // Find all properties posted by this owner
+        const propertiesByOwner = await AddModel.find({
+            $or: [
+                { phoneNumber },
+                { phoneNumber: `+91${phoneNumber}` },
+                { phoneNumber: `91${phoneNumber}` }
+            ]
+        });
+
+        if (!propertiesByOwner.length) {
+            return res.status(200).json({ offersCount: 0 });
+        }
+
+        // Extract property IDs
+        const propertyIds = propertiesByOwner.map(property => property.ppcId);
+
+        // Count all offers on these properties
+        const offersCount = await Offer.countDocuments({ ppcId: { $in: propertyIds } });
+
+        return res.status(200).json({ offersCount });
+
+    } catch (error) {
+        return res.status(500).json({ message: "Error fetching owner's offer count.", error: error.message });
+    }
+});
+
 
 
 router.put('/offers/delete/:ppcId/:buyerPhoneNumber', async (req, res) => {
@@ -463,9 +554,6 @@ router.put("/reject-offer", async (req, res) => {
         res.status(500).json({ message: "Internal Server Error", error: error.message });
     }
 });
-
-
-
 
   
   // Fetch Single Offer by ID

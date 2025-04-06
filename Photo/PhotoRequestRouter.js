@@ -4,6 +4,7 @@ const router = express.Router();
 const PhotoRequest = require("../Photo/PhotoRequestModel");
 const Property = require("../AddModel"); // Ensure correct path
 const AddModel = require("../AddModel");
+const NotificationUser = require('../Notification/NotificationDetailModel');
 
 const multer = require("multer");
 const path = require("path");
@@ -88,6 +89,7 @@ router.get("/photos/get/:ppcId/:requesterPhoneNumber", getPhotoRequest);
 
 
 
+
 router.put("/photos/send/:ppcId/:requesterPhoneNumber", upload.single("photo"), async (req, res) => {
   try {
       const { ppcId, requesterPhoneNumber } = req.params;
@@ -137,7 +139,6 @@ router.get("/photos/get-all", async (req, res) => {
 
 
 
-
 router.post("/photo-request", async (req, res) => {
   try {
     const { ppcId, requesterPhoneNumber } = req.body;
@@ -148,14 +149,12 @@ router.post("/photo-request", async (req, res) => {
 
     // Check if a request already exists for this property and user
     const existingRequest = await PhotoRequest.findOne({ ppcId, requesterPhoneNumber });
-
     if (existingRequest) {
       return res.status(409).json({ message: "You have already sent a photo request for this property." });
     }
 
     // Fetch Property Details
     const property = await Property.findOne({ ppcId });
-
     if (!property) {
       return res.status(404).json({ message: "Property not found." });
     }
@@ -177,22 +176,34 @@ router.post("/photo-request", async (req, res) => {
       breadth: property.breadth,
       totalArea: property.totalArea,
       ownership: property.ownership,
-      photoURL: property.photoURL, // ✅ Store photo URL if available
+      photoURL: property.photoURL,
       status: "photo request pending",
     });
 
     await photoRequest.save();
 
-    res.status(201).json({ message: "Photo request submitted successfully.", photoRequest });
+    // ✅ Add Notification for the property owner
+    try {
+      await NotificationUser.create({
+        recipientPhoneNumber: property.phoneNumber, // Property owner's number
+        senderPhoneNumber: requesterPhoneNumber,     // Who sent the request
+        ppcId,
+        message: `User ${requesterPhoneNumber} requested photos for your property.`,
+        createdAt: new Date()
+      });
+    } catch (notifErr) {
+    }
+
+    res.status(201).json({
+      message: "Photo request submitted successfully.",
+      photoRequest
+    });
   } catch (error) {
     res.status(500).json({ message: "Error submitting photo request.", error: error.message });
   }
 });
 
- 
 
-
-// ✅ Function to normalize phone numbers
 function normalizePhoneNumber(phoneNumber) {
     phoneNumber = phoneNumber.replace(/\D/g, ""); // Remove non-numeric characters
     if (phoneNumber.startsWith("91") && phoneNumber.length === 12) {
@@ -362,6 +373,8 @@ router.get("/photo-requests/buyer/count/:phoneNumber", async (req, res) => {
       return res.status(500).json({ message: "Internal Server Error", error: error.message });
   }
 });
+
+
 
 
 router.get("/property/:ppcId", async (req, res) => {
@@ -559,6 +572,7 @@ router.put("/photo-requests/delete/:ppcId", async (req, res) => {
 
 
 
+
 router.put("/photo-requests/delete/:ppcId/:phoneNumber", async (req, res) => {
   try {
       const { ppcId, phoneNumber } = req.params;
@@ -694,7 +708,6 @@ router.put("/reject-photo-request", async (req, res) => {
         res.status(500).json({ message: "Internal Server Error", error: error.message });
     }
 });
-
 
 
 router.put("/accept-photo-request", async (req, res) => {
