@@ -84,7 +84,66 @@ router.post("/send-interests", async (req, res) => {
         });
     }
 });
+router.get("/get-unread-notifications", async (req, res) => {
+    let { phoneNumber } = req.query;
+  
+    if (!phoneNumber) {
+      return res.status(400).json({ message: "Phone number is required" });
+    }
+  
+    phoneNumber = phoneNumber.replace(/\D/g, "");
+  
+    const variants = [
+      "+91" + phoneNumber.slice(-10),
+      "91" + phoneNumber.slice(-10),
+      phoneNumber.slice(-10)
+    ];
+  
+    try {
+      const notifications = await NotificationUser.find({
+        recipientPhoneNumber: { $in: variants },
+        isRead: false
+      }).sort({ createdAt: -1 });
+  
+      return res.status(200).json({
+        message: "Unread notifications fetched successfully",
+        notifications
+      });
+    } catch (error) {
+      return res.status(500).json({ message: "Internal Server Error", error: error.message });
+    }
+  });
+  
 
+  router.get("/get-read-notifications", async (req, res) => {
+    let { phoneNumber } = req.query;
+  
+    if (!phoneNumber) {
+      return res.status(400).json({ message: "Phone number is required" });
+    }
+  
+    phoneNumber = phoneNumber.replace(/\D/g, "");
+  
+    const variants = [
+      "+91" + phoneNumber.slice(-10),
+      "91" + phoneNumber.slice(-10),
+      phoneNumber.slice(-10)
+    ];
+  
+    try {
+      const notifications = await NotificationUser.find({
+        recipientPhoneNumber: { $in: variants },
+        isRead: true
+      }).sort({ createdAt: -1 });
+  
+      return res.status(200).json({
+        message: "Read notifications fetched successfully",
+        notifications
+      });
+    } catch (error) {
+      return res.status(500).json({ message: "Internal Server Error", error: error.message });
+    }
+  });
 
 router.get("/get-user-notifications", async (req, res) => {
     let { phoneNumber } = req.query;
