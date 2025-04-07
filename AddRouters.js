@@ -1414,7 +1414,51 @@ router.get('/fetch-delete-status', async (req, res) => {
     }
   });
   
-
+  router.get("/user-get-last-view/:phoneNumber", async (req, res) => {
+    try {
+      const { phoneNumber } = req.params;
+  
+      if (!phoneNumber) {
+        return res.status(400).json({ message: "Phone number is required" });
+      }
+  
+      const digits = phoneNumber.replace(/\D/g, "").slice(-10);
+  
+      const variants = [
+        "+91" + digits,
+        "91" + digits,
+        digits
+      ];
+  
+  
+      const userViews = await UserViewsModel.findOne({
+        phoneNumber: { $in: variants }
+      });
+  
+      if (!userViews || userViews.viewedProperties.length === 0) {
+        return res.status(404).json({ message: "No viewed properties found" });
+      }
+  
+      const sortedViews = userViews.viewedProperties.sort(
+        (a, b) => new Date(b.viewedAt) - new Date(a.viewedAt)
+      );
+  
+      const lastViewed = sortedViews[0];
+  
+      const property = await AddModel.findOne({ ppcId: lastViewed.ppcId });
+  
+      if (!property) {
+        return res.status(404).json({ message: "Property not found" });
+      }
+  
+      return res.status(200).json({
+        property,
+        viewedAt: lastViewed.viewedAt,
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Internal Server Error", error: error.message });
+    }
+  });
 
   router.get('/fetch-complete-status', async (req, res) => {
     const { phoneNumber } = req.query;
