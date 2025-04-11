@@ -1,40 +1,43 @@
-const mongoose = require("mongoose");
-
-
-
 const BuyerAssistanceSchema = new mongoose.Schema({
-  ba_id: { type: Number, required: true },  // Unique BA ID per user
+  ba_id: { type: Number },  // Unique BA ID per user
   baName:{
     type:String
   },
   ppcId:{type: String},
   phoneNumber: { type: String, required: true },
-  altPhoneNumber: String,
-  city: { type: String, required: true },
+  altPhoneNumber:{
+    type: String,
+  },
+  city: { type: String,required: true },
   area: { type: String, required: true },
   loanInput: {
     type:String,
   },
   minPrice:{
     type:String,
+    required: true
   },
   maxPrice: {
     type:String,
+    required: true
   },
   totalArea:{
     type:String,
   },
   areaUnit: {
     type:String,
+    required: true
   },
   noOfBHK: {
     type:String,
   },
   propertyMode: {
     type:String,
+    v
   },
   propertyType:{
     type:String,
+    required: true
   },
   propertyAge:{
     type:String,
@@ -53,7 +56,7 @@ type:String,
 ennum:["buyer-assiatance-interest","remove-assistance-interest"]
   },
  
-  paymentType: { type: String, required: true },
+  paymentType: { type: String },
   description: String,
   isDeleted: { type: Boolean, default: false },   // Soft delete flag
   deletedAt: { type: Date, default: null }  

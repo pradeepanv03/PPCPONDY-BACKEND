@@ -119,9 +119,6 @@ router.get("/get-buyer-id/:phoneNumber", async (req, res) => {
 });
 
 
-
-
-
 router.post("/add-buyerAssistance", async (req, res) => {
   try {
     const { phoneNumber } = req.body;
@@ -140,7 +137,7 @@ router.post("/add-buyerAssistance", async (req, res) => {
     if (existingUser) {
       newBaId = existingUser.ba_id; // Reuse existing ba_id
     } else {
-      // Find the latest `ba_id`
+      // Find the latest ba_id
       let lastRecord = await BuyerAssistance.findOne({}, { ba_id: 1 }).sort({ ba_id: -1 });
 
       if (lastRecord && lastRecord.ba_id) {
@@ -153,6 +150,7 @@ router.post("/add-buyerAssistance", async (req, res) => {
     // Create a new Buyer Assistance request
     const newRequest = new BuyerAssistance({ 
       ...req.body, 
+      baName: req.body.baName || "Buyer",
       phoneNumber: formattedPhoneNumber, 
       ba_id: newBaId
     });
@@ -164,7 +162,6 @@ router.post("/add-buyerAssistance", async (req, res) => {
       recipientPhoneNumber: "admin", // Could be a group inbox, admin panel, or even dynamic
       senderPhoneNumber: formattedPhoneNumber,
       message: `New buyer assistance request submitted by ${formattedPhoneNumber}`,
-      ppcId: null, // Not linked to a specific property
       createdAt: new Date(),
     });
 
@@ -178,9 +175,6 @@ router.post("/add-buyerAssistance", async (req, res) => {
   }
 });
 
-
-
-// Get All Buyer Assistance Requests
 router.get("/get-buyerAssistance", async (req, res) => {
   try {
     const requests = await BuyerAssistance.find({});
