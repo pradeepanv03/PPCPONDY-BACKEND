@@ -65,7 +65,6 @@ router.get("/user-get-views/:phoneNumber", async (req, res) => {
 
     res.status(200).json(properties);
   } catch (error) {
-    console.error("Error fetching viewed properties:", error);
     res.status(500).json({ message: "Internal Server Error", error: error.message });
   }
 });
