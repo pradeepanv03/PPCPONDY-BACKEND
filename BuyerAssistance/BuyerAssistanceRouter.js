@@ -1,4 +1,10 @@
 
+
+
+
+
+
+
 const express = require("express");
 const router = express.Router();
 const BuyerAssistance = require("../BuyerAssistance/BuyerAssistanceModel");
@@ -111,6 +117,8 @@ router.get("/get-buyer-id/:phoneNumber", async (req, res) => {
     return res.status(500).json({ success: false, message: "Server error" });
   }
 });
+
+
 
 
 
@@ -243,6 +251,7 @@ router.get("/fetch-matching-property", async (req, res) => {
       area: area,
       facing: facing,
       price: { $gte: parseInt(minPrice), $lte: parseInt(maxPrice) }, // Convert price range to numbers
+      // status: { $in: ["active", "incomplete"] }, // Allow "incomplete" properties
     };
 
 
@@ -325,6 +334,7 @@ router.get("/fetch-matched-properties", async (req, res) => {
 
 
 
+
 router.get("/fetch-buyer-matched-properties-by-phone", async (req, res) => {
   try {
     const { phoneNumber } = req.query;
@@ -376,6 +386,63 @@ router.get("/fetch-buyer-matched-properties-by-phone", async (req, res) => {
 });
 
 
+const normalizePhone = (phone) => {
+  return phone.replace(/\D/g, "").slice(-10);
+};
+
+
+router.get("/fetch-owner-matched-properties", async (req, res) => {
+  try {
+    let { phoneNumber } = req.query;
+
+    if (!phoneNumber) {
+      return res.status(400).json({ message: "Buyer Assistance phone number is required" });
+    }
+
+    const normalizedPhone = normalizePhone(phoneNumber);
+
+    // Fetch all Buyer Assistance Requests for this phone number
+    const buyerRequests = await BuyerAssistance.find({
+      phoneNumber: { $regex: new RegExp(`${normalizedPhone}$`, "i") }
+    });
+
+    if (!buyerRequests.length) {
+      return res.status(404).json({ message: "No Buyer Assistance requests found for this phone number" });
+    }
+
+
+    let matchedProperties = [];
+
+    for (let buyerRequest of buyerRequests) {
+
+
+      const properties = await AddModel.find({
+        propertyMode: buyerRequest.propertyMode,
+        propertyType: buyerRequest.propertyType,
+        city: buyerRequest.city,
+        area: buyerRequest.area,
+        facing: buyerRequest.facing,
+        price: {
+          $gte: Number(buyerRequest.minPrice),
+          $lte: Number(buyerRequest.maxPrice)
+        }
+      });
+
+
+      matchedProperties.push(...properties);
+    }
+
+    res.status(200).json({
+      message: "Owner-Matched Properties fetched successfully!",
+      total: matchedProperties.length,
+      properties: matchedProperties
+    });
+
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error });
+  }
+});
+
 
 router.get("/fetch-buyer-matched-properties", async (req, res) => {
   try {
@@ -385,10 +452,9 @@ router.get("/fetch-buyer-matched-properties", async (req, res) => {
       return res.status(400).json({ message: "Phone number is required" });
     }
 
-    // ✅ Normalize phone number (Remove non-digits & keep last 10 digits)
-    let normalizedPhone = phoneNumber.replace(/\D/g, "").slice(-10);
+    const normalizedPhone = normalizePhone(phoneNumber);
 
-    // ✅ Fetch property details using phone number
+    // Fetch a property posted by this user
     const property = await AddModel.findOne({
       phoneNumber: { $regex: new RegExp(`${normalizedPhone}$`, "i") }
     });
@@ -398,7 +464,7 @@ router.get("/fetch-buyer-matched-properties", async (req, res) => {
     }
 
 
-    // ✅ Fetch Buyer Assistance requests matching property details
+    // Fetch Buyer Assistance requests that match this property
     const matchedBuyerRequests = await BuyerAssistance.find({
       propertyMode: property.propertyMode,
       propertyType: property.propertyType,
@@ -422,7 +488,7 @@ router.get("/fetch-buyer-matched-properties", async (req, res) => {
 });
 
 
-// ✅ Fetch Matched Properties Count
+
 router.get("/fetch-buyer-matched-properties/count", async (req, res) => {
   try {
     let { phoneNumber } = req.query;
@@ -460,59 +526,6 @@ router.get("/fetch-buyer-matched-properties/count", async (req, res) => {
 });
 
 
-
-router.get("/fetch-owner-matched-properties", async (req, res) => {
-  try {
-    let { phoneNumber } = req.query;
-
-    if (!phoneNumber) {
-      return res.status(400).json({ message: "Buyer Assistance phone number is required" });
-    }
-
-    // Normalize phone number
-    const normalizedPhone = phoneNumber.replace(/\D/g, "").slice(-10);
-
-
-    // Fetch all Buyer Assistance Requests for this user
-    const buyerRequests = await BuyerAssistance.find({
-      phoneNumber: { $regex: new RegExp(`${normalizedPhone}$`, "i") }
-    });
-
-    if (!buyerRequests.length) {
-      return res.status(404).json({ message: "No Buyer Assistance requests found for this phone number" });
-    }
-
-
-    let matchedProperties = [];
-
-    for (let buyerRequest of buyerRequests) {
-  
-      // Fetch Owner-Matched Properties
-      const properties = await AddModel.find({
-        propertyMode: buyerRequest.propertyMode,
-        propertyType: buyerRequest.propertyType,
-        city: buyerRequest.city,
-        area: buyerRequest.area,
-        facing: buyerRequest.facing,
-        price: { $gte: Number(buyerRequest.minPrice), $lte: Number(buyerRequest.maxPrice) }
-      });
-
-
-      matchedProperties.push(...properties);
-    }
-
-    res.status(200).json({
-      message: "Owner-Matched Properties fetched successfully!",
-      total: matchedProperties.length,
-      properties: matchedProperties
-    });
-
-  } catch (error) {
-    res.status(500).json({ message: "Server error", error });
-  }
-});
-
-
 router.get("/fetch-owner-matched-properties/count", async (req, res) => {
   try {
     let { phoneNumber } = req.query;
@@ -538,7 +551,7 @@ router.get("/fetch-owner-matched-properties/count", async (req, res) => {
     let matchedPropertyCount = 0;
 
     for (let buyerRequest of buyerRequests) {
- 
+    
 
       // Count Owner-Matched Properties
       const count = await AddModel.countDocuments({
@@ -655,6 +668,8 @@ router.delete("/delete-buyerAssistance/:id", async (req, res) => {
     res.status(500).json({ message: "Error deleting Buyer Assistance request", error });
   }
 });
+
+
 
 
 router.put("/update-status-buyer-assistance/:id", async (req, res) => {
@@ -817,6 +832,7 @@ router.delete("/permanent-delete-buyer-assistance/:id", async (req, res) => {
     res.status(500).json({ message: "Server error", error });
   }
 });
+
 
 
 

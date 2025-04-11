@@ -2,6 +2,9 @@ const express = require('express');
 const router = express.Router();
 const PricingPlans = require('../plans/PricingPlanModel');
 const AddModel = require('../AddModel');
+const NotificationUser = require('../Notification/NotificationDetailModel');
+
+
 
 
 // Normalize phone number function
@@ -120,6 +123,8 @@ router.post('/store-plan', async (req, res) => {
     }
 });
 
+
+
 router.post("/select-plan", async (req, res) => {
     const { phoneNumber, planId } = req.body;
 
@@ -148,6 +153,20 @@ router.post("/select-plan", async (req, res) => {
         selectedPlan.phoneNumber = phoneNumber;
         await selectedPlan.save();
 
+        // ✅ Save notification (Plan Selection Notification)
+        try {
+
+            const notification = await NotificationUser.create({
+                recipientPhoneNumber: phoneNumber,
+                senderPhoneNumber: phoneNumber, // since the user is selecting the plan for themselves
+                ppcId: "PLAN-" + planId, // using a pseudo ppcId for tracking
+                message: `A new plan has been selected by ${phoneNumber}.`,
+                createdAt: new Date()
+            });
+
+        } catch (notifErr) {
+        }
+
         return res.status(200).json({
             status: "success",
             message: "Plan selected successfully!",
@@ -162,6 +181,7 @@ router.post("/select-plan", async (req, res) => {
         });
     }
 });
+
 
 
 router.get('/plans', async (req, res) => {

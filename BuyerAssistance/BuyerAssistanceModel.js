@@ -1,7 +1,12 @@
 const mongoose = require("mongoose");
 
+
+
 const BuyerAssistanceSchema = new mongoose.Schema({
   ba_id: { type: Number, required: true },  // Unique BA ID per user
+  baName:{
+    type:String
+  },
   ppcId:{type: String},
   phoneNumber: { type: String, required: true },
   altPhoneNumber: String,

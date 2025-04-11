@@ -6,6 +6,9 @@ const Property = require("../AddModel"); // Ensure correct path
 const AddModel = require("../AddModel");
 const NotificationUser = require('../Notification/NotificationDetailModel');
 
+
+
+
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
@@ -42,6 +45,10 @@ const upload = multer({
 });
 
 
+
+
+
+// ✅ Fetch All Photo Requests
 router.get("/photo-requests", async (req, res) => {
   try {
     const photoRequests = await PhotoRequest.find().lean();
@@ -86,6 +93,8 @@ const getPhotoRequest = async (req, res) => {
 
 // Define the route
 router.get("/photos/get/:ppcId/:requesterPhoneNumber", getPhotoRequest);
+
+
 
 
 
@@ -136,6 +145,8 @@ router.get("/photos/get-all", async (req, res) => {
     res.status(500).json({ message: "Error fetching photo requests.", error: error.message });
   }
 });
+
+
 
 
 
@@ -203,7 +214,10 @@ router.post("/photo-request", async (req, res) => {
   }
 });
 
+ 
 
+
+// ✅ Function to normalize phone numbers
 function normalizePhoneNumber(phoneNumber) {
     phoneNumber = phoneNumber.replace(/\D/g, ""); // Remove non-numeric characters
     if (phoneNumber.startsWith("91") && phoneNumber.length === 12) {
@@ -253,8 +267,9 @@ router.get("/photo-requests/owner/:phoneNumber", async (req, res) => {
                   photos:property.photos,
                   createdAt: request.createdAt,
                   updatedAt: request.updatedAt,
-                  postedUserPhoneNumber: request.postedUserPhoneNumber || "N/A", // Ensure it doesn't break if missing
-              };
+                  postedUserPhoneNumber: request.postedUserPhoneNumber || "N/A",
+                  createdAt:request.createdAt || null,
+                };
           })
       );
       
@@ -302,6 +317,7 @@ router.get("/photo-requests/buyer/:phoneNumber", async (req, res) => {
                     createdAt: request.createdAt,
                     updatedAt: request.updatedAt,
                     photoURL: request.photoURL || null,
+                    createdAt:request.createdAt || null,
 
                 };
             })
@@ -373,7 +389,6 @@ router.get("/photo-requests/buyer/count/:phoneNumber", async (req, res) => {
       return res.status(500).json({ message: "Internal Server Error", error: error.message });
   }
 });
-
 
 
 
@@ -571,8 +586,6 @@ router.put("/photo-requests/delete/:ppcId", async (req, res) => {
 });
 
 
-
-
 router.put("/photo-requests/delete/:ppcId/:phoneNumber", async (req, res) => {
   try {
       const { ppcId, phoneNumber } = req.params;
@@ -673,6 +686,7 @@ router.put("/photo-requests/reject/:ppcId", async (req, res) => {
 
 
 
+
 router.put("/reject-photo-request", async (req, res) => {
     try {
         const { ppcId, requesterPhoneNumber } = req.body;
@@ -708,6 +722,7 @@ router.put("/reject-photo-request", async (req, res) => {
         res.status(500).json({ message: "Internal Server Error", error: error.message });
     }
 });
+
 
 
 router.put("/accept-photo-request", async (req, res) => {

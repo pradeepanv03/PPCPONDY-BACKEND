@@ -11,6 +11,9 @@ const UserViewsSchema = new mongoose.Schema(
         viewerPhoneNumber: { type: String,  index: true }, 
         propertyOwnerPhoneNumber: { type: String},
         viewedAt: { type: Date, default: Date.now },
+        photos:{
+          type:String,
+        }
       },
     ],
   },
@@ -18,6 +21,5 @@ const UserViewsSchema = new mongoose.Schema(
 );
 
 module.exports = mongoose.model("UserViews", UserViewsSchema);
-
 
 

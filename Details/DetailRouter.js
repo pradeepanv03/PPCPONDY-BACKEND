@@ -84,7 +84,39 @@ router.post("/send-interests", async (req, res) => {
         });
     }
 });
-router.get("/get-unread-notifications", async (req, res) => {
+
+
+router.get("/get-user-notifications", async (req, res) => {
+    let { phoneNumber } = req.query;
+  
+    if (!phoneNumber) {
+      return res.status(400).json({ message: "Phone number is required" });
+    }
+  
+    phoneNumber = phoneNumber.replace(/\D/g, ""); // Remove non-digits
+  
+    const variants = [
+      "+91" + phoneNumber.slice(-10),
+      "91" + phoneNumber.slice(-10),
+      phoneNumber.slice(-10)
+    ];
+  
+  
+    try {
+      const notifications = await NotificationUser.find({
+        recipientPhoneNumber: { $in: variants }
+      }).sort({ createdAt: -1 });
+  
+      return res.status(200).json({
+        message: "Notifications fetched successfully",
+        notifications
+      });
+    } catch (error) {
+      return res.status(500).json({ message: "Internal Server Error", error: error.message });
+    }
+  });
+
+  router.get("/get-unread-notifications", async (req, res) => {
     let { phoneNumber } = req.query;
   
     if (!phoneNumber) {
@@ -144,36 +176,7 @@ router.get("/get-unread-notifications", async (req, res) => {
       return res.status(500).json({ message: "Internal Server Error", error: error.message });
     }
   });
-
-router.get("/get-user-notifications", async (req, res) => {
-    let { phoneNumber } = req.query;
   
-    if (!phoneNumber) {
-      return res.status(400).json({ message: "Phone number is required" });
-    }
-  
-    phoneNumber = phoneNumber.replace(/\D/g, ""); // Remove non-digits
-  
-    const variants = [
-      "+91" + phoneNumber.slice(-10),
-      "91" + phoneNumber.slice(-10),
-      phoneNumber.slice(-10)
-    ];
-  
-  
-    try {
-      const notifications = await NotificationUser.find({
-        recipientPhoneNumber: { $in: variants }
-      }).sort({ createdAt: -1 });
-  
-      return res.status(200).json({
-        message: "Notifications fetched successfully",
-        notifications
-      });
-    } catch (error) {
-      return res.status(500).json({ message: "Internal Server Error", error: error.message });
-    }
-  });
 
   router.put("/mark-notifications-read", async (req, res) => {
     let { phoneNumber } = req.body;
@@ -271,6 +274,9 @@ router.delete('/delete-notification/:id', async (req, res) => {
   });
   
   
+
+
+
 
 router.get('/get-interest-owner', async (req, res) => {
     try {
@@ -620,6 +626,7 @@ router.post('/need-help', async (req, res) => {
 
 
 
+
 router.get('/get-help-as-buyer', async (req, res) => {
     try {
         let { postedPhoneNumber } = req.query;
@@ -634,31 +641,36 @@ router.get('/get-help-as-buyer', async (req, res) => {
             postedPhoneNumber = postedPhoneNumber.slice(2);
         }
 
-        // Find properties with help requests
+        // Fetch properties where phone number matches AND helpRequests is not empty
         const propertiesWithBuyerHelpRequests = await AddModel.find({
-            $or: [
-                { phoneNumber: postedPhoneNumber },
-                { phoneNumber: `+91${postedPhoneNumber}` },
-                { phoneNumber: `91${postedPhoneNumber}` }
+            $and: [
+                {
+                    $or: [
+                        { phoneNumber: postedPhoneNumber },
+                        { phoneNumber: `+91${postedPhoneNumber}` },
+                        { phoneNumber: `91${postedPhoneNumber}` }
+                    ]
+                },
+                { helpRequests: { $exists: true, $ne: [] } }
             ]
         });
 
         if (propertiesWithBuyerHelpRequests.length === 0) {
-            return res.status(404).json({ message: 'No properties found for this buyer help request.' });
+            return res.status(404).json({ message: 'No buyer help requests found for this user.' });
         }
 
-        // Map properties with help requests
+        // Format response
         const helpRequestsData = propertiesWithBuyerHelpRequests.map(property => ({
             ppcId: property.ppcId,
             status: property.status,
             views: property.views || 0,
-            propertyMode:property.propertyMode,
-            propertyType:property.propertyType,
-            area:property.area,
-            city:property.city,
-            createdAt:property.createdAt,
-            updatedAt:property.updatedAt,
-            price:property.price,
+            propertyMode: property.propertyMode,
+            propertyType: property.propertyType,
+            area: property.area,
+            city: property.city,
+            createdAt: property.createdAt,
+            updatedAt: property.updatedAt,
+            price: property.price,
             photos: property.photos || [],
             postedUserPhoneNumber: property.phoneNumber,
             propertyDetails: property.propertyDetails || {},
@@ -668,7 +680,7 @@ router.get('/get-help-as-buyer', async (req, res) => {
         }));
 
         return res.status(200).json({
-            message: 'Properties with help requests fetched successfully.',
+            message: 'Buyer help requests fetched successfully.',
             helpRequestsData
         });
 
@@ -679,52 +691,55 @@ router.get('/get-help-as-buyer', async (req, res) => {
 
 
 
-router.get('/get-help-as-owner', async (req, res) => {
-    const { phoneNumber } = req.query;  // Extract phoneNumber from query parameters
-
-    if (!phoneNumber) {
-        return res.status(400).json({ message: 'Phone number is required.' });
-    }
-
-    try {
-        // Fetch properties where the helpRequests include this phoneNumber
-        const propertiesWithHelpRequests = await AddModel.find({
-            'helpRequests.phoneNumber': phoneNumber
-        });
-
-        if (propertiesWithHelpRequests.length === 0) {
-            return res.status(404).json({ message: 'No properties found with help requests for this phone number.' });
-        }
-
-        const helpRequestsData = propertiesWithHelpRequests.map(property => ({
-            ppcId: property.ppcId,
-            status: property.status,
-            photos: property.photos || [],  
-            postedUserPhoneNumber: property.phoneNumber,  
-            ownerName: property.ownerName,
-            views: property.views || 0,
-            propertyMode:property.propertyMode,
-            propertyType:property.propertyType,
-            area:property.area,
-            city:property.city,
-            createdAt:property.createdAt,
-            updatedAt:property.updatedAt,
-            price:property.price,
-            helpRequestedUserPhoneNumbers: property.helpRequests 
-                ? property.helpRequests.map(request => request.phoneNumber) 
-                : [],  
-        }));
-
-        return res.status(200).json({ 
-            message: 'Help requests fetched successfully', 
-            helpRequestsData 
-        });
-    } catch (error) {
-        return res.status(500).json({ message: 'Internal Server Error', error: error.message });
-    }
-});
-
-
+const normalizePhoneFormats = (phone) => {
+    const clean = phone.replace(/\D/g, ""); // remove non-digits
+    return [clean, `+91${clean}`, `91${clean}`];
+  };
+  
+  router.get('/get-help-as-owner', async (req, res) => {
+      const { phoneNumber } = req.query;
+  
+      if (!phoneNumber) {
+          return res.status(400).json({ message: 'Phone number is required.' });
+      }
+  
+      const variants = normalizePhoneFormats(phoneNumber);
+  
+      try {
+          // Match any variant of phone number inside helpRequests
+          const propertiesWithHelpRequests = await AddModel.find({
+              'helpRequests.phoneNumber': { $in: variants }
+          });
+  
+          if (propertiesWithHelpRequests.length === 0) {
+              return res.status(404).json({ message: 'No properties found with help requests for this phone number.' });
+          }
+  
+          const helpRequestsData = propertiesWithHelpRequests.map(property => ({
+              ppcId: property.ppcId,
+              status: property.status,
+              photos: property.photos || [],
+              postedUserPhoneNumber: property.phoneNumber,
+              ownerName: property.ownerName,
+              views: property.views || 0,
+              propertyMode: property.propertyMode,
+              propertyType: property.propertyType,
+              area: property.area,
+              city: property.city,
+              createdAt: property.createdAt,
+              updatedAt: property.updatedAt,
+              price: property.price,
+              helpRequestedUserPhoneNumbers: property.helpRequests?.map(req => req.phoneNumber) || [],
+          }));
+  
+          return res.status(200).json({ 
+              message: 'Help requests fetched successfully', 
+              helpRequestsData 
+          });
+      } catch (error) {          return res.status(500).json({ message: 'Internal Server Error', error: error.message });
+      }
+  });
+  
 
 router.get('/get-all-help-requests', async (req, res) => {
     try {
@@ -811,6 +826,8 @@ router.delete('/delete-help/:ppcId', async (req, res) => {
         return res.status(500).json({ message: 'Internal Server Error', error: error.message });
     }
 });
+
+
 
 
 router.post('/contact', async (req, res) => {
@@ -1007,17 +1024,20 @@ router.put("/contact/undo/:ppcId/:contactUser", async (req, res) => {
 });
 
 
+
 router.get('/get-contact-owner', async (req, res) => {
-    const { phoneNumber } = req.query;  // Extract phoneNumber from query parameters
+    const { phoneNumber } = req.query;
 
     if (!phoneNumber) {
         return res.status(400).json({ success: false, message: 'Phone number is required.' });
     }
 
     try {
-        // Fetch properties where the phone number is in the contactRequests array
+        const cleanPhone = phoneNumber.trim().replace(/[^+\d]/g, '');
+        const regex = new RegExp(`${cleanPhone}$`, 'i');
+
         const propertiesWithContactRequests = await AddModel.find({
-            'contactRequests.phoneNumber': phoneNumber
+            'contactRequests.phoneNumber': { $regex: regex }
         });
 
         if (!propertiesWithContactRequests.length) {
@@ -1026,23 +1046,24 @@ router.get('/get-contact-owner', async (req, res) => {
 
         const contactRequestsData = propertiesWithContactRequests.map(property => ({
             ppcId: property.ppcId,
-            postedUserPhoneNumber: property.phoneNumber,  // Property owner's phone number
-            contactRequestedUserPhoneNumbers: property.contactRequests.map(req => req.phoneNumber),  
+            postedUserPhoneNumber: property.phoneNumber,
+            contactRequestedUserPhoneNumbers: property.contactRequests.map(req => req.phoneNumber),
             views: property.views || 0,
-            propertyMode:property.propertyMode,
-            propertyType:property.propertyType,
-            area:property.area,
-            city:property.city,
-            createdAt:property.createdAt,
-            updatedAt:property.updatedAt,
-            price:property.price,
+            propertyMode: property.propertyMode,
+            propertyType: property.propertyType,
+            area: property.area,
+            city: property.city,
+            createdAt: property.createdAt,
+            updatedAt: property.updatedAt,
+            price: property.price,
             bestTimeToCall: property.bestTimeToCall,
             email: property.email,
             status: property.status,
-            photos: property.photos || [],  
+            photos: property.photos || [],
         }));
 
         return res.status(200).json({ success: true, message: 'Contact requests fetched successfully', contactRequestsData });
+
     } catch (error) {
         return res.status(500).json({ success: false, message: 'Internal Server Error', error: error.message });
     }
@@ -1206,6 +1227,8 @@ router.post('/report-property', async (req, res) => {
 
 
 
+
+
 router.get('/get-reportproperty-buyer', async (req, res) => {
     try {
         let { postedPhoneNumber } = req.query;
@@ -1325,40 +1348,49 @@ router.put("/reportproperty/undo/:ppcId/:phoneNumber", async (req, res) => {
 });
 
 router.get('/get-reportproperty-owner', async (req, res) => {
-    const { phoneNumber } = req.query;  // Extract phoneNumber from query parameters
+    const { phoneNumber } = req.query;
 
     if (!phoneNumber) {
         return res.status(400).json({ message: 'Phone number is required.' });
     }
 
     try {
-        // Fetch properties where the phone number is included in the helpRequests
-        const propertiesWithreportPropertyRequests = await AddModel.find({
-            'reportProperty.phoneNumber': phoneNumber
+        // Clean and normalize phone number
+        const cleanPhone = phoneNumber.trim().replace(/[^+\d]/g, '');
+        const regex = new RegExp(`${cleanPhone}$`, 'i'); // Match ending with the digits
+
+        // Find properties where reportProperty includes this phone number
+        const propertiesWithReportPropertyRequests = await AddModel.find({
+            'reportProperty.phoneNumber': { $regex: regex }
         });
 
-        if (propertiesWithreportPropertyRequests.length === 0) {
-            return res.status(404).json({ message: 'No properties found with help requests for this phone number.' });
+        if (propertiesWithReportPropertyRequests.length === 0) {
+            return res.status(404).json({ message: 'No properties found with report property requests for this phone number.' });
         }
 
-        const reportPropertyRequestsData = propertiesWithreportPropertyRequests.map(property => ({
+        const reportPropertyRequestsData = propertiesWithReportPropertyRequests.map(property => ({
             ppcId: property.ppcId,
-            postedUserPhoneNumber: property.phoneNumber,  // Property owner's phone number
-            reportPropertyRequestedUserPhoneNumbers: Array.isArray(property.reportPropertyRequests) ? 
-                property.reportPropertyRequests.map(request => request.phoneNumber) : [],  
-                views: property.views || 0,
-                propertyMode:property.propertyMode,
-                propertyType:property.propertyType,
-                area:property.area,
-                city:property.city,
-                createdAt:property.createdAt,
-                updatedAt:property.updatedAt,
-                price:property.price,
-            status: property.status  ,
-            photos: property.photos || [],  
+            postedUserPhoneNumber: property.phoneNumber,
+            reportPropertyRequestedUserPhoneNumbers: Array.isArray(property.reportProperty)
+                ? property.reportProperty.map(request => request.phoneNumber)
+                : [],
+            views: property.views || 0,
+            propertyMode: property.propertyMode,
+            propertyType: property.propertyType,
+            area: property.area,
+            city: property.city,
+            createdAt: property.createdAt,
+            updatedAt: property.updatedAt,
+            price: property.price,
+            status: property.status,
+            photos: property.photos || [],
         }));
 
-        return res.status(200).json({ message: 'Help requests fetched successfully', reportPropertyRequestsData });
+        return res.status(200).json({
+            message: 'Report property requests fetched successfully',
+            reportPropertyRequestsData
+        });
+
     } catch (error) {
         return res.status(500).json({ message: 'Internal Server Error', error: error.message });
     }
@@ -1447,6 +1479,7 @@ router.delete('/delete-report/:ppcId', async (req, res) => {
 
 
 
+
 router.post('/report-sold-out', async (req, res) => {
     const { phoneNumber, ppcId } = req.body;
 
@@ -1518,8 +1551,6 @@ router.post('/report-sold-out', async (req, res) => {
 });
 
 
-
-// ✅ Fetch Sold-Out Requests
 router.get('/get-soldout-buyer', async (req, res) => {
     try {
         let { postedPhoneNumber } = req.query;
@@ -1528,46 +1559,50 @@ router.get('/get-soldout-buyer', async (req, res) => {
             return res.status(400).json({ message: 'Posted user phone number is required.' });
         }
 
-        // Normalize phone number format for consistent querying
-        postedPhoneNumber = postedPhoneNumber.replace(/\D/g, ''); // Remove non-numeric characters
+        // Normalize phone number format
+        postedPhoneNumber = postedPhoneNumber.replace(/\D/g, '');
         if (postedPhoneNumber.startsWith('91') && postedPhoneNumber.length === 12) {
-            postedPhoneNumber = postedPhoneNumber.slice(2); // Convert '917878789090' → '7878789090'
+            postedPhoneNumber = postedPhoneNumber.slice(2);
         }
 
-        // Fetch properties where the buyer has submitted a sold-out request
-        const propertiesWithBuyerSoldOutRequests = await AddModel.find({
-            $or: [
-                { phoneNumber: postedPhoneNumber },
-                { phoneNumber: `+91${postedPhoneNumber}` },
-                { phoneNumber: `91${postedPhoneNumber}` }
+        // Fetch properties where the owner matches and soldOutReport exists
+        const propertiesWithSoldOutRequests = await AddModel.find({
+            $and: [
+                {
+                    $or: [
+                        { phoneNumber: postedPhoneNumber },
+                        { phoneNumber: `+91${postedPhoneNumber}` },
+                        { phoneNumber: `91${postedPhoneNumber}` }
+                    ]
+                },
+                { soldOutReport: { $exists: true, $ne: [] } }
             ]
         });
 
-        if (propertiesWithBuyerSoldOutRequests.length === 0) {
-            return res.status(404).json({ message: 'No properties found for this buyer sold-out request.' });
+        if (propertiesWithSoldOutRequests.length === 0) {
+            return res.status(404).json({ message: 'No sold-out requests found for this user.' });
         }
 
-        // Map properties to include sold-out requests
-        const soldOutRequestsData = propertiesWithBuyerSoldOutRequests.map(property => ({
+        // Map response data
+        const soldOutRequestsData = propertiesWithSoldOutRequests.map(property => ({
             ppcId: property.ppcId,
-            area:property.area,
-            createdAt:property.createdAt,
-            updatedAt:property.updatedAt,
-            price:property.price,
-            city:property.city,
-            totalArea:property.totalArea,
-            areaUnit:property.areaUnit,
-            price:property.price,
-            ownerName:property.ownerName,
-            bedrooms:property.bedrooms,
-            ownerShip:property.ownership,
+            area: property.area,
+            city: property.city,
+            createdAt: property.createdAt,
+            updatedAt: property.updatedAt,
+            price: property.price,
+            totalArea: property.totalArea,
+            areaUnit: property.areaUnit,
+            ownerName: property.ownerName,
+            bedrooms: property.bedrooms,
+            ownership: property.ownership,
             status: property.status,
             photos: property.photos || [],
-            postedUserPhoneNumber: property.phoneNumber, // Owner's phone number
+            postedUserPhoneNumber: property.phoneNumber,
             propertyDetails: property.propertyDetails || {},
-            soldOutRequestersPhoneNumbers: (property.soldOutReport || []) // Ensure it's an array
-                .filter(req => req.phoneNumber) // Remove empty/null entries
-                .map(req => req.phoneNumber) // Get phone numbers
+            soldOutRequestersPhoneNumbers: (property.soldOutReport || [])
+                .filter(req => req.phoneNumber)
+                .map(req => req.phoneNumber)
         }));
 
         return res.status(200).json({
@@ -1580,7 +1615,7 @@ router.get('/get-soldout-buyer', async (req, res) => {
     }
 });
 
-// ✅ Delete Sold-Out Request
+
 router.put("/soldout/delete/:ppcId/:phoneNumber", async (req, res) => {
     try {
         const { ppcId, phoneNumber } = req.params;
@@ -1642,54 +1677,56 @@ router.put("/soldout/undo/:ppcId/:phoneNumber", async (req, res) => {
 });
 
 
-
 router.get('/get-soldout-owner', async (req, res) => {
-    const { phoneNumber } = req.query;  // Extract phoneNumber from query parameters
+    const { phoneNumber } = req.query;
 
     if (!phoneNumber) {
         return res.status(400).json({ message: 'Phone number is required.' });
     }
 
     try {
+        const cleanPhone = phoneNumber.trim().replace(/[^+\d]/g, '');
+        const regex = new RegExp(`${cleanPhone}$`, 'i');
 
-        // Use $elemMatch to find documents where soldOutReport contains an object with the specified phoneNumber
         const propertiesWithSoldOutRequests = await AddModel.find({
-            // soldOutReport: { $elemMatch: { phoneNumber: phoneNumber } }
-            'soldOutReport.phoneNumber': phoneNumber
-
+            'soldOutReport.phoneNumber': { $regex: regex }
         });
 
-
-        if (propertiesWithSoldOutRequests.length === 0) {
+        if (!propertiesWithSoldOutRequests.length) {
             return res.status(404).json({
                 message: 'No properties found with soldout requests for this phone number.',
                 phoneNumber
             });
         }
 
-        // Map over the results to structure the response
         const soldOutRequestsData = propertiesWithSoldOutRequests.map(property => ({
             ppcId: property.ppcId,
-            postedUserPhoneNumber: property.phoneNumber,  // Property owner's phone number
-            soldOutRequestedUserPhoneNumbers: Array.isArray(property.soldOutReport) ?
-                property.soldOutReport.map(request => request.phoneNumber) : [],  
-                views: property.views || 0,
-                propertyMode:property.propertyMode,
-                propertyType:property.propertyType,
-                area:property.area,
-                city:property.city,
-                createdAt:property.createdAt,
-                updatedAt:property.updatedAt,
-                price:property.price,
-            status: property.status  ,
-            photos: property.photos || [],  
+            postedUserPhoneNumber: property.phoneNumber,
+            soldOutRequestedUserPhoneNumbers: Array.isArray(property.soldOutReport)
+                ? property.soldOutReport.map(req => req.phoneNumber)
+                : [],
+            views: property.views || 0,
+            propertyMode: property.propertyMode,
+            propertyType: property.propertyType,
+            area: property.area,
+            city: property.city,
+            createdAt: property.createdAt,
+            updatedAt: property.updatedAt,
+            price: property.price,
+            status: property.status,
+            photos: property.photos || []
         }));
 
-        return res.status(200).json({ message: 'Soldout requests fetched successfully', soldOutRequestsData });
+        return res.status(200).json({
+            success: true,
+            message: 'Soldout requests fetched successfully',
+            soldOutRequestsData
+        });
     } catch (error) {
         return res.status(500).json({ message: 'Internal Server Error', error: error.message });
     }
 });
+
 
 
 router.get('/get-all-soldout-requests', async (req, res) => {
@@ -1787,7 +1824,7 @@ router.post("/add-favorite", async (req, res) => {
             return res.status(404).json({ message: "Property not found" });
         }
 
-        await property.addFavoriteRequest(phoneNumber);
+        await property.favoriteRequests(phoneNumber);
 
         // ✅ Notification to owner
         try {
@@ -1879,6 +1916,7 @@ router.post("/remove-favorite", async (req, res) => {
 });
 
 
+
 router.get("/favorite-history/:phoneNumber", async (req, res) => {
     const { phoneNumber } = req.params;
 
@@ -1925,6 +1963,9 @@ router.get("/favorite-history/:phoneNumber", async (req, res) => {
         return res.status(500).json({ message: "Internal Server Error", error: error.message });
     }
 });
+
+
+
 
 
 
@@ -2040,58 +2081,70 @@ router.get("/remove-favorite-buyer", async (req, res) => {
 
 
 
-
-// Get properties that a specific user has favorited
 router.get('/remove-favorite-owner', async (req, res) => {
     try {
-        const phoneNumber = req.query.phoneNumber?.trim(); // Ensure phoneNumber is provided and trimmed
-
-        if (!phoneNumber) {
-            return res.status(400).json({ message: "Phone number is required." });
+      const { phoneNumber } = req.query;
+  
+      if (!phoneNumber) {
+        return res.status(400).json({ message: "Phone number is required." });
+      }
+  
+      // Normalize to last 10 digits
+      const cleanPhone = phoneNumber.replace(/\D/g, '').slice(-10);
+      const regex = new RegExp(`${cleanPhone}$`, 'i');
+  
+      // Fetch only properties where at least one favoriteRemoved entry matches the user
+      const properties = await AddModel.find({
+        favoriteRemoved: {
+          $elemMatch: {
+            phoneNumber: { $regex: regex }
+          }
         }
-
-        // Find properties where the user has favorited
-        const propertiesWithFavorites = await AddModel.find({
-            "favoriteRemoved": { $elemMatch: { phoneNumber } } // Ensure array contains phoneNumber
-        });
-
-        if (!propertiesWithFavorites.length) {
-            return res.status(404).json({ message: "No favorite properties found for this phone number." });
-        }
-
-        // Format response
-        const favoriteRemovedData = propertiesWithFavorites.map((property) => ({
-            ppcId: property.ppcId,
-            postedUserPhoneNumber: property.phoneNumber, // Property owner's phone number
-            removedFavoriteUserPhoneNumbers: property.favoriteRemoved 
-                ? property.favoriteRemoved.map((fav) => fav.phoneNumber) 
-                : [],
-            propertyMode: property.propertyMode,
-            propertyType: property.propertyType,
-            bedrooms:property.bedrooms,
-            totalArea:property.totalArea,
-            bestTimeToCall:property.bestTimeToCall,
-            areaUnit:property.areaUnit,
-            ownerShip:property.ownership,
-            ownerName:property.ownerName,
-            area: property.area,
-            city: property.city,
-            createdAt: property.createdAt,
-            updatedAt: property.updatedAt,
-            price: property.price,
-            status: property.status,
-            photos: property.photos || [],  
-        }));
-
-        return res.status(200).json({
-            message: "Favorite properties fetched successfully",
-            favoriteRemovedData,
-        });
-
+      });
+  
+      if (!properties.length) {
+        return res.status(404).json({ message: "No removed favorite properties found for this phone number." });
+      }
+  
+      // Build clean response with only relevant favoriteRemoved entries
+      const favoriteRemovedData = properties.map((property) => {
+        const matchedRemovals = property.favoriteRemoved.filter(entry =>
+          regex.test(entry.phoneNumber)
+        );
+  
+        return {
+          ppcId: property.ppcId,
+          postedUserPhoneNumber: property.phoneNumber,
+          removedFavoriteUserPhoneNumbers: matchedRemovals.map(entry => entry.phoneNumber),
+          propertyMode: property.propertyMode,
+          propertyType: property.propertyType,
+          bedrooms: property.bedrooms,
+          totalArea: property.totalArea,
+          bestTimeToCall: property.bestTimeToCall,
+          areaUnit: property.areaUnit,
+          ownerShip: property.ownership,
+          ownerName: property.ownerName,
+          area: property.area,
+          city: property.city,
+          createdAt: property.createdAt,
+          updatedAt: property.updatedAt,
+          price: property.price,
+          status: property.status,
+          photos: property.photos || [],
+        };
+      });
+  
+      return res.status(200).json({
+        message: "Favorite removed properties fetched successfully",
+        favoriteRemovedData,
+        count: favoriteRemovedData.length
+      });
+  
     } catch (error) {
-        return res.status(500).json({ message: "Internal Server Error", error: error.message });
+      return res.status(500).json({ message: "Internal Server Error", error: error.message });
     }
-});
+  });
+  
 
 router.put("/favoriteRemoved/delete/:ppcId/:favoriteUserPhone", async (req, res) => {
     try {
@@ -2145,52 +2198,64 @@ router.put("/favoriteRemoved/undo/:ppcId/:favoriteUserPhone", async (req, res) =
 
 
 
+
 router.get('/get-favorite-owner', async (req, res) => {
     try {
-        const { phoneNumber } = req.query; // Extract phoneNumber from query parameters
-
-        if (!phoneNumber) {
-            return res.status(400).json({ message: "Phone number is required." });
+      const { phoneNumber } = req.query;
+  
+      if (!phoneNumber) {
+        return res.status(400).json({ message: "Phone number is required." });
+      }
+  
+      const cleanPhone = phoneNumber.replace(/\D/g, '').slice(-10); // Normalize to last 10 digits
+      const regex = new RegExp(`${cleanPhone}$`, 'i');
+  
+      // Find properties where favoriteRequests includes this user
+      const properties = await AddModel.find({
+        favoriteRequests: {
+          $elemMatch: {
+            phoneNumber: { $regex: regex }
+          }
         }
-
-        // Find properties where the user has favorited
-        const propertiesWithFavorites = await AddModel.find({
-            "favoriteRequests.phoneNumber": phoneNumber, // Corrected query
-        });
-
-        if (propertiesWithFavorites.length === 0) {
-            return res.status(404).json({ message: "No favorite properties found for this phone number." });
-        }
-
-        // Format response
-        const favoriteRequestsData = propertiesWithFavorites.map((property) => ({
-            ppcId: property.ppcId,
-            postedUserPhoneNumber: property.phoneNumber, // Property owner's phone number
-            favoritedUserPhoneNumbers: property.favoriteRequests.map((fav) => fav.phoneNumber), // List of users who favorited
-            propertyMode: property.propertyMode,
-            propertyType: property.propertyType,
-            area: property.area,
-            city: property.city,
-            createdAt: property.createdAt,
-            updatedAt: property.updatedAt,
-            price: property.price,
-            status: property.status,
-            photos: property.photos || [],  
-        }));
-
-        return res.status(200).json({
-            message: "Favorite requests fetched successfully.",
-            favoriteCount: favoriteRequestsData.length, // ✅ Return the count
-            favoriteRequestsData: favoriteRequestsData || [] // Ensuring it’s never undefined
-        });
-        
+      });
+  
+      if (properties.length === 0) {
+        return res.status(404).json({ message: "No favorite properties found for this phone number." });
+      }
+  
+      // Filter favoriteRequests to include only matching phone numbers
+      const favoriteRequestsData = properties.map((property) => {
+        const matchingFavorites = property.favoriteRequests.filter(fav =>
+          regex.test(fav.phoneNumber)
+        );
+  
+        return {
+          ppcId: property.ppcId,
+          postedUserPhoneNumber: property.phoneNumber,
+          favoritedUserPhoneNumbers: matchingFavorites.map(fav => fav.phoneNumber),
+          propertyMode: property.propertyMode,
+          propertyType: property.propertyType,
+          area: property.area,
+          city: property.city,
+          createdAt: property.createdAt,
+          updatedAt: property.updatedAt,
+          price: property.price,
+          status: property.status,
+          photos: property.photos || [],
+        };
+      });
+  
+      return res.status(200).json({
+        message: "Favorite requests fetched successfully.",
+        favoriteRequestsData,
+        count: favoriteRequestsData.length
+      });
+  
     } catch (error) {
-        return res.status(500).json({ message: "Internal Server Error", error: error.message });
+      return res.status(500).json({ message: "Internal Server Error", error: error.message });
     }
-});
-
-
-
+  });
+  
 router.get("/get-favorite-buyer", async (req, res) => {
     try {
         let { postedPhoneNumber } = req.query;
@@ -2199,43 +2264,47 @@ router.get("/get-favorite-buyer", async (req, res) => {
             return res.status(400).json({ message: "Posted user phone number is required." });
         }
 
-        // Normalize phone number format for consistent querying
-        postedPhoneNumber = postedPhoneNumber.replace(/\D/g, ""); // Remove non-numeric characters
+        // Normalize phone number
+        postedPhoneNumber = postedPhoneNumber.replace(/\D/g, "");
         if (postedPhoneNumber.startsWith("91") && postedPhoneNumber.length === 12) {
-            postedPhoneNumber = postedPhoneNumber.slice(2); // Convert '917878789090' → '7878789090'
+            postedPhoneNumber = postedPhoneNumber.slice(2);
         }
 
-        // Fetch properties listed by the given owner
+        // Fetch only properties listed by the owner and where favoriteRequests is not empty
         const propertiesWithFavoriteRequests = await AddModel.find({
-            $or: [
-                { phoneNumber: postedPhoneNumber },
-                { phoneNumber: `+91${postedPhoneNumber}` },
-                { phoneNumber: `91${postedPhoneNumber}` }
+            $and: [
+                {
+                    $or: [
+                        { phoneNumber: postedPhoneNumber },
+                        { phoneNumber: `+91${postedPhoneNumber}` },
+                        { phoneNumber: `91${postedPhoneNumber}` }
+                    ]
+                },
+                { favoriteRequests: { $exists: true, $ne: [] } }
             ]
         });
 
         if (propertiesWithFavoriteRequests.length === 0) {
-            return res.status(404).json({ message: "No properties found for this owner." });
+            return res.status(404).json({ message: "No favorite requests found for this user." });
         }
 
-        // Map properties to include details about the favorite requests
+        // Build response data
         const favoriteRequestsData = propertiesWithFavoriteRequests.map(property => ({
             ppcId: property.ppcId,
             status: property.status,
-            propertyMode:property.propertyMode,
-            propertyType:property.propertyType,
-            area:property.area,
-            city:property.city,
-            createdAt:property.createdAt,
-            updatedAt:property.updatedAt,
-            price:property.price,
+            propertyMode: property.propertyMode,
+            propertyType: property.propertyType,
+            area: property.area,
+            city: property.city,
+            createdAt: property.createdAt,
+            updatedAt: property.updatedAt,
+            price: property.price,
             photos: property.photos || [],
-            postedUserPhoneNumber: property.phoneNumber, // Property owner's phone number
-            propertyDetails: property.propertyDetails || {}, // Property details
-            favoritedUsersPhoneNumbers: (property.favoriteRequests || []) // Ensure it's an array
-                .filter(req => req.phoneNumber) // Remove empty/null entries
-                .map(req => req.phoneNumber) // Get phone numbers
-
+            postedUserPhoneNumber: property.phoneNumber,
+            propertyDetails: property.propertyDetails || {},
+            favoritedUsersPhoneNumbers: (property.favoriteRequests || [])
+                .filter(req => req.phoneNumber)
+                .map(req => req.phoneNumber)
         }));
 
         return res.status(200).json({
@@ -2249,8 +2318,6 @@ router.get("/get-favorite-buyer", async (req, res) => {
 });
 
 
-
-// 📌 PUT: Delete a Favorite Buyer Request
 router.put("/favorite/delete/:ppcId/:favoriteUser", async (req, res) => {
     try {
         const { ppcId, favoriteUser } = req.params;

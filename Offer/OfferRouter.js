@@ -6,21 +6,23 @@ const AddModel = require('../AddModel');
 const NotificationUser = require('../Notification/NotificationDetailModel');
 
 
+
 router.get("/offers/owner/:phoneNumber", async (req, res) => {
     try {
         let { phoneNumber } = req.params;
 
-        // Normalize phone number format (remove non-numeric characters)
+        // Normalize phone number: remove non-numeric characters
         phoneNumber = phoneNumber.replace(/\D/g, "");
 
+        // Prepare possible phone number formats
         const phoneVariants = [
-            phoneNumber,
-            `${phoneNumber}`,
-            `+${phoneNumber}`
+            phoneNumber,            // 9876543210
+            `91${phoneNumber}`,     // 919876543210
+            `+91${phoneNumber}`     // +919876543210
         ];
 
 
-        // Find all offers made by the buyer
+        // Find all offers by this buyer's phone number
         const buyerOffers = await Offer.find({ phoneNumber: { $in: phoneVariants } });
 
 
@@ -28,67 +30,73 @@ router.get("/offers/owner/:phoneNumber", async (req, res) => {
             return res.status(404).json({ message: "No offers found for this buyer." });
         }
 
-
-        // Extract unique property PPC IDs from offers
+        // Get unique PPC IDs from the offers
         const uniquePpcIds = [...new Set(buyerOffers.map((offer) => offer.ppcId))];
 
-
-        // Fetch property details in one query
+        // Fetch matching property details in one query
         const properties = await AddModel.find({ ppcId: { $in: uniquePpcIds } }).lean();
 
-
-        // Map properties for quick lookup
+        // Create a map for faster property lookup
         const propertyMap = new Map(properties.map((property) => [property.ppcId, property]));
 
-        // Construct response with property & offer details
+        // Combine offer and property info
         const offersData = buyerOffers.map((offer) => {
             const property = propertyMap.get(offer.ppcId);
             return {
                 ppcId: offer.ppcId,
                 offeredPrice: offer.price,
                 buyerPhoneNumber: offer.phoneNumber,
-                originalPrice: property ? property.price : null,
-                propertyMode: property ? property.propertyMode : null,
-                propertyType: property ? property.propertyType : null,
-                postedUserPhoneNumber: property ? property.phoneNumber : null, // Owner's phone number
+                originalPrice: property?.price || null,
+                propertyMode: property?.propertyMode || null,
+                propertyType: property?.propertyType || null,
+                postedUserPhoneNumber: property?.phoneNumber || null,
                 status: offer.status || "pending"
             };
         });
 
+        // Respond with the combined offer/property data
         res.status(200).json({
             message: "Buyer’s offers fetched successfully.",
             offers: offersData
         });
+
     } catch (error) {
-        res.status(500).json({ message: "Error fetching buyer offers.", error: error.message });
+        res.status(500).json({
+            message: "Error fetching buyer offers.",
+            error: error.message
+        });
     }
 });
 
-// ✅ Fetch Offer Count for an Owner Based on Buyer's Phone Number
+
+
 router.get("/offers/owner/count/:phoneNumber", async (req, res) => {
     try {
         let { phoneNumber } = req.params;
 
-        // Normalize phone number format (remove non-numeric characters)
+        // Remove non-digits
         phoneNumber = phoneNumber.replace(/\D/g, "");
 
+        // Build multiple formats
         const phoneVariants = [
-            phoneNumber,
-            `${phoneNumber}`,
-            `+${phoneNumber}`
+            phoneNumber,            // 9876543210
+            `91${phoneNumber}`,     // 919876543210
+            `+91${phoneNumber}`     // +919876543210
         ];
 
-
-        // Count all offers made by the buyer
+        // 🔍 Match using $in — this is safe, no regex!
         const offerCount = await Offer.countDocuments({ phoneNumber: { $in: phoneVariants } });
-
 
         return res.status(200).json({ offerCount });
 
     } catch (error) {
-        return res.status(500).json({ message: "Error fetching offer count.", error: error.message });
+        return res.status(500).json({
+            message: "Error fetching offer count.",
+            error: error.message
+        });
     }
 });
+
 
 
 router.post('/offer', async (req, res) => {
@@ -171,6 +179,7 @@ router.post('/offer', async (req, res) => {
         res.status(500).json({ message: "Error processing offer", error: error.message });
     }
 });
+
 
 
 

@@ -30,20 +30,37 @@ router.post('/user/register', async (req, res) => {
   }
 
   try {
-    const otp = generateOtp();
     const now = new Date();
     let user = await UserLogin.findOne({ phone });
 
     if (user) {
-      // Prevent banned or deleted users from re-registering
+      // ✅ Block permanently logged-out users
+      if (user.permanentlyLoggedOut) {
+        return res.status(403).json({ message: 'You have been permanently logged out and cannot log in again.' });
+      }
+
       if (user.status === 'banned') {
         return res.status(403).json({ message: 'Your account is banned. Contact support.' });
       }
+
       if (user.status === 'deleted') {
         return res.status(403).json({ message: 'Your account is deleted. Please contact support.' });
       }
 
-      // Update user with new OTP
+      // ✅ Auto-login if already verified
+      if (user.otpStatus === 'verified') {
+        user.loginDate = now;
+        user.loginMode = mode;
+        await user.save();
+
+        return res.status(200).json({
+          message: 'Welcome back! You are already verified.',
+          data: user,
+        });
+      }
+
+      // 🟡 Send OTP for not-yet-verified users
+      const otp = generateOtp();
       user.otp = otp;
       user.loginDate = now;
       user.otpStatus = 'pending';
@@ -53,26 +70,31 @@ router.post('/user/register', async (req, res) => {
       await user.save();
       await sendOtpToPhone(formatPhoneNumber(phone, countryCode), otp);
 
-      return res.status(200).json({ message: 'OTP updated and sent.', data: user });
+      return res.status(200).json({ message: 'OTP sent for verification.', data: user });
+
     } else {
-      // Create a new user record
+      // 🆕 New user
+      const otp = generateOtp();
       const newUser = new UserLogin({
-        phone, countryCode, otp, loginDate: now, otpStatus: 'pending', loginMode: mode,
+        phone,
+        countryCode,
+        otp,
+        loginDate: now,
+        otpStatus: 'pending',
+        loginMode: mode,
       });
 
       await newUser.save();
       await sendOtpToPhone(formatPhoneNumber(phone, countryCode), otp);
 
-      return res.status(201).json({ message: 'User registered successfully; OTP sent.', data: newUser });
+      return res.status(201).json({ message: 'New user registered. OTP sent.', data: newUser });
     }
   } catch (error) {
-    return res.status(500).json({ message: 'Something went wrong', error: error.message });
+    return res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
 
 
- 
-//otp verification
 router.post('/user/verify-otp', async (req, res) => {
   const { phone, otp } = req.body;
 
@@ -100,6 +122,31 @@ router.post('/user/verify-otp', async (req, res) => {
     return res.status(500).json({ message: "Something went wrong", error: error.message || error });
   }
 });
+
+
+router.post('/user/permanent-logout', async (req, res) => {
+  const { phone } = req.body;
+
+  if (!phone) {
+    return res.status(400).json({ message: 'Phone number is required.' });
+  }
+
+  try {
+    const user = await UserLogin.findOne({ phone });
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found.' });
+    }
+
+    user.permanentlyLoggedOut = true;
+    await user.save();
+
+    return res.status(200).json({ message: 'User permanently logged out.' });
+  } catch (error) {
+    return res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
 
 
 router.get('/user/data/:phone', async (req, res) => {

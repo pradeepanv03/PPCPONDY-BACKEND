@@ -122,7 +122,12 @@ const countryCodes = [
         enum: ['active', 'banned', 'deleted','normal'], // Added 'active' as a default status
         default: 'active',
     },
-});
+    permanentlyLoggedOut: {
+        type: Boolean,
+        default: false
+      },
+      
+    });
 
 
 

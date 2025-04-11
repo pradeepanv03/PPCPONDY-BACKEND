@@ -230,7 +230,6 @@ const AddSchema = new mongoose.Schema({
     date: { type: Date, default: Date.now },
    }],
 
-
   bankLoan: { type: String },
   negotiation: { type: String },
 

@@ -125,6 +125,7 @@ router.put("/notification/:id", async (req, res) => {
     }
 });
 
+
 // Delete a notification by _id
 router.delete("/notification/:id", async (req, res) => {
     try {
@@ -172,5 +173,18 @@ router.get("/notifications", async (req, res) => {
 });
 
 module.exports = router;
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
