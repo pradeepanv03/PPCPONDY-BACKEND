@@ -30,13 +30,16 @@ router.post('/user/register', async (req, res) => {
   }
 
   try {
+    const otp = generateOtp();
     const now = new Date();
     let user = await UserLogin.findOne({ phone });
 
     if (user) {
-      // ✅ Block permanently logged-out users
+      // Prevent permanently logged out users
       if (user.permanentlyLoggedOut) {
-        return res.status(403).json({ message: 'You have been permanently logged out and cannot log in again.' });
+        return res.status(403).json({
+          message: 'This user has permanently logged out. Please contact admin for access.'
+        });
       }
 
       if (user.status === 'banned') {
@@ -47,20 +50,7 @@ router.post('/user/register', async (req, res) => {
         return res.status(403).json({ message: 'Your account is deleted. Please contact support.' });
       }
 
-      // ✅ Auto-login if already verified
-      if (user.otpStatus === 'verified') {
-        user.loginDate = now;
-        user.loginMode = mode;
-        await user.save();
-
-        return res.status(200).json({
-          message: 'Welcome back! You are already verified.',
-          data: user,
-        });
-      }
-
-      // 🟡 Send OTP for not-yet-verified users
-      const otp = generateOtp();
+      // Update existing user
       user.otp = otp;
       user.loginDate = now;
       user.otpStatus = 'pending';
@@ -70,11 +60,9 @@ router.post('/user/register', async (req, res) => {
       await user.save();
       await sendOtpToPhone(formatPhoneNumber(phone, countryCode), otp);
 
-      return res.status(200).json({ message: 'OTP sent for verification.', data: user });
-
+      return res.status(200).json({ message: 'OTP updated and sent.', data: user });
     } else {
-      // 🆕 New user
-      const otp = generateOtp();
+      // Create new user
       const newUser = new UserLogin({
         phone,
         countryCode,
@@ -87,10 +75,65 @@ router.post('/user/register', async (req, res) => {
       await newUser.save();
       await sendOtpToPhone(formatPhoneNumber(phone, countryCode), otp);
 
-      return res.status(201).json({ message: 'New user registered. OTP sent.', data: newUser });
+      // return res.status(201).json({ message: 'User registered successfully; OTP sent.', data: newUser });
+      return res.status(201).json({
+        message: 'User registered successfully; OTP sent.',
+        data: {
+          otp, // explicitly send it
+          phone: newUser.phone,
+        }
+      });
+      
     }
   } catch (error) {
-    return res.status(500).json({ message: 'Server error', error: error.message });
+    return res.status(500).json({ message: 'Something went wrong', error: error.message });
+  }
+});
+
+router.post('/user/permanent-logout', async (req, res) => {
+  const { phone } = req.body;
+
+  if (!phone) {
+    return res.status(400).json({ message: 'Phone number is required.' });
+  }
+
+  try {
+    const user = await UserLogin.findOne({ phone });
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found.' });
+    }
+
+    user.permanentlyLoggedOut = true;
+    await user.save();
+
+    return res.status(200).json({ message: 'User permanently logged out.' });
+  } catch (error) {
+    return res.status(500).json({ message: 'Something went wrong.', error: error.message });
+  }
+});
+
+
+router.post('/user/revert-permanent-logout', async (req, res) => {
+  const { phone } = req.body;
+
+  if (!phone) {
+    return res.status(400).json({ message: 'Phone number is required.' });
+  }
+
+  try {
+    const user = await UserLogin.findOne({ phone });
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found.' });
+    }
+
+    user.permanentlyLoggedOut = false;
+    await user.save();
+
+    return res.status(200).json({ message: 'Permanent logout reverted. User can now log in.' });
+  } catch (error) {
+    return res.status(500).json({ message: 'Something went wrong.', error: error.message });
   }
 });
 
