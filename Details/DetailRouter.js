@@ -830,90 +830,73 @@ router.delete('/delete-help/:ppcId', async (req, res) => {
 
 
 
+
 router.post('/contact', async (req, res) => {
     const { phoneNumber, ppcId } = req.body;
-
+  
     try {
-        // Find the property by its ppcId
-        const property = await AddModel.findOne({ ppcId });
-
-        if (!property) {
-            return res.status(404).json({ success: false, message: 'Property not found' });
-        }
-
-        const postedUserPhoneNumber = property.phoneNumber;
-        const {
-            propertyMode, propertyType, price, area, email,
-            bestTimeToCall, ownerName, status, photos = []
-        } = property;
-
-        if (!postedUserPhoneNumber) {
-            return res.status(404).json({ success: false, message: 'Phone number not found for the property owner.' });
-        }
-
-        // Check if the user has already made a contact request
-        const isAlreadyContacted = property.contactRequests.some(req => req.phoneNumber === phoneNumber);
-
-        if (isAlreadyContacted) {
-            return res.status(400).json({
-                success: false,
-                message: 'You have already requested contact for this property.',
-                status: 'alreadyContacted',
-                alreadyContactedNumbers: property.contactRequests.map(req => req.phoneNumber),
-            });
-        }
-
-        // Add contact request and update property
-        const updatedProperty = await AddModel.findOneAndUpdate(
-            { ppcId },
-            {
-                $push: { contactRequests: { phoneNumber, createdAt: new Date() } },
-                $set: { status: 'contact', updatedAt: new Date() },
-                $inc: { views: 1 }
-            },
-            { new: true }
-        );
-
-        if (!updatedProperty) {
-            return res.status(500).json({ success: false, message: 'Failed to update contact requests.' });
-        }
-
-        // ✅ Send Notification to Property Owner
-        try {
-            const contactNotification = await NotificationUser.create({
-                recipientPhoneNumber: updatedProperty.phoneNumber,  // Owner
-                senderPhoneNumber: phoneNumber,                    // Contacting user
-                ppcId,
-                message: `User ${phoneNumber} requested contact for your property.`,
-                createdAt: new Date()
-            });
-        } catch (notifErr) {
-        }
-
-        return res.status(200).json({
-            success: true,
-            message: 'Your contact request has been recorded!',
-            status: 'contact',
-            postedUserPhoneNumber,
-            email,
-            propertyMode,
-            propertyType,
-            price,
-            area,
-            bestTimeToCall,
-            ownerName,
-            status: updatedProperty.status,
-            photos,
-            views: updatedProperty.views,
-            contactRequests: updatedProperty.contactRequests,
-            createdAt: new Date(),
-            updatedAt: new Date()
+      const property = await AddModel.findOne({ ppcId });
+  
+      if (!property) {
+        return res.status(404).json({ success: false, message: 'Property not found' });
+      }
+  
+      const postedUserPhoneNumber = property.phoneNumber;
+      const {
+        propertyMode, propertyType, price, area, email,
+        bestTimeToCall, ownerName, status, photos = []
+      } = property;
+  
+      if (!postedUserPhoneNumber) {
+        return res.status(404).json({ success: false, message: 'Owner phone not found.' });
+      }
+  
+      // Directly update the contactRequests (allow multiple entries)
+      const updatedProperty = await AddModel.findOneAndUpdate(
+        { ppcId },
+        {
+          $push: { contactRequests: { phoneNumber, createdAt: new Date() } },
+          $set: { status: 'contact', updatedAt: new Date() },
+          $inc: { views: 1 }
+        },
+        { new: true }
+      );
+  
+      // Save notification
+      try {
+        await NotificationUser.create({
+          recipientPhoneNumber: postedUserPhoneNumber,
+          senderPhoneNumber: phoneNumber,
+          ppcId,
+          message:` User ${phoneNumber} requested contact for your property.`,
+          createdAt: new Date()
         });
-
+      } catch (notifErr) {
+      }
+  
+      return res.status(200).json({
+        success: true,
+        message: 'Contact request sent!',
+        postedUserPhoneNumber,
+        email,
+        propertyMode,
+        propertyType,
+        price,
+        area,
+        bestTimeToCall,
+        ownerName,
+        status: updatedProperty.status,
+        photos,
+        views: updatedProperty.views,
+        contactRequests: updatedProperty.contactRequests,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
+  
     } catch (error) {
-        return res.status(500).json({ success: false, message: 'Internal Server Error', error: error.message });
+      return res.status(500).json({ success: false, message: 'Server Error', error: error.message });
     }
-});
+  });
 
 
 router.get("/get-contact-buyer", async (req, res) => {
