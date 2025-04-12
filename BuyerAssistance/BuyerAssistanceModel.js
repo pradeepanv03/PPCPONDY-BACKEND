@@ -1,3 +1,4 @@
+const mongoose = require("mongoose")
 const BuyerAssistanceSchema = new mongoose.Schema({
   ba_id: { type: Number },  // Unique BA ID per user
   baName:{
@@ -33,7 +34,7 @@ const BuyerAssistanceSchema = new mongoose.Schema({
   },
   propertyMode: {
     type:String,
-    v
+    
   },
   propertyType:{
     type:String,
