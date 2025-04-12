@@ -164,7 +164,105 @@ router.delete('/user-call/permanent-delete/:id', async (req, res) => {
   }
 });
 
+router.get("/user-last-10-days-views/:phoneNumber", async (req, res) => {
+  try {
+    const { phoneNumber } = req.params;
 
+    if (!phoneNumber) {
+      return res.status(400).json({ message: "Phone number is required" });
+    }
+
+    const digits = phoneNumber.replace(/\D/g, "").slice(-10);
+    const variants = [`+91${digits}, 91${digits}, digits`];
+
+    const userViews = await UserViewsModel.findOne({
+      phoneNumber: { $in: variants },
+    });
+
+    if (!userViews || !Array.isArray(userViews.viewedProperties)) {
+      return res.status(404).json({ message: "No viewed properties found" });
+    }
+
+    const now = new Date();
+    const tenDaysAgo = new Date();
+    tenDaysAgo.setDate(now.getDate() - 10);
+
+    const recentViews = userViews.viewedProperties
+      .filter((view) => {
+        const viewedAt = new Date(view.viewedAt);
+        return viewedAt >= tenDaysAgo && viewedAt <= now;
+      })
+      .sort((a, b) => new Date(b.viewedAt) - new Date(a.viewedAt));
+
+    if (recentViews.length === 0) {
+      return res
+        .status(404)
+        .json({ message: "No views in the last 10 days" });
+    }
+
+    const properties = await Promise.all(
+      recentViews.map(async (view) => {
+        const prop = await AddModel.findOne({ ppcId: view.ppcId });
+        return prop
+          ? {
+              ...prop.toObject(),
+              viewedAt: view.viewedAt,
+            }
+          : null;
+      })
+    );
+
+    const filteredProperties = properties.filter(Boolean);
+
+    return res.status(200).json({
+      message: "Viewed properties in the last 10 days",
+      properties: filteredProperties,
+    });
+  } catch (error) {
+    console.error("Error fetching viewed properties:", error);
+    res.status(500).json({ message: "Internal Server Error", error: error.message });
+  }
+});
+
+
+
+router.get("/user-get-all-last-views", async (req, res) => {
+  try {
+    const allUserViews = await UserViewsModel.find();
+
+    if (!allUserViews || allUserViews.length === 0) {
+      return res.status(404).json({ message: "No user views found" });
+    }
+
+    const result = [];
+
+    for (const user of allUserViews) {
+      if (user.viewedProperties.length === 0) continue;
+
+      // Sort by viewedAt descending
+      const sortedViews = user.viewedProperties.sort(
+        (a, b) => new Date(b.viewedAt) - new Date(a.viewedAt)
+      );
+
+      const lastViewed = sortedViews[0];
+
+      const property = await AddModel.findOne({ ppcId: lastViewed.ppcId });
+
+      if (property) {
+        result.push({
+          phoneNumber: user.phoneNumber,
+          property,
+          viewedAt: lastViewed.viewedAt,
+        });
+      }
+    }
+
+    return res.status(200).json(result);
+  } catch (error) {
+    console.error("Error fetching all last viewed properties:", error);
+    res.status(500).json({ message: "Internal Server Error", error: error.message });
+  }
+});
 
 // ✅ PUT: Update a call entry by ID
 router.put('/update-call/:id', async (req, res) => {
