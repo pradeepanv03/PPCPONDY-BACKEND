@@ -2,7 +2,6 @@ const mongoose = require("mongoose");
 
 const ProfileSchema = new mongoose.Schema(
   {
-    pucNumber: { type: String, unique: true },
     name: { type: String, required: true},
     email: { type: String, unique: true },
     mobile: { type: String },

@@ -1,5 +1,4 @@
 
-
 const mongoose = require("mongoose");
 
 const UserViewsSchema = new mongoose.Schema(
@@ -21,5 +20,7 @@ const UserViewsSchema = new mongoose.Schema(
 );
 
 module.exports = mongoose.model("UserViews", UserViewsSchema);
+
+
 
 

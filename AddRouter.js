@@ -1,5 +1,4 @@
 
-
 const express = require('express');
 const router = express.Router();
 const AddModel = require('./AddModel');
@@ -13,7 +12,6 @@ const NotificationUser = require('./Notification/NotificationDetailModel');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-
 
 
 
@@ -50,219 +48,15 @@ const upload = multer({
 });
 
 
-router.post('/user-call', async (req, res) => {
+router.put('/activate-all-properties', async (req, res) => {
   try {
-    const newCall = await CallUserList.create(req.body);
-    res.status(201).json(newCall);
-  } catch (error) {
-    res.status(400).json({ error: error.message });
+    await AddModel.updateMany({}, { $set: { status: "active" } });
+    res.status(200).json({ message: "All properties activated successfully!" });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to activate all properties." });
   }
 });
 
-
-router.get('/user-call/property-owner/:phoneNumber', async (req, res) => {
-  try {
-    const { phoneNumber } = req.params;
-
-    // Normalize input to last 10 digits (assumes Indian numbers)
-    const lastTenDigits = phoneNumber.slice(-10);
-
-    // Create regex patterns to match possible formats
-    const phoneRegex = new RegExp(`^(\\+91|91)?${lastTenDigits}$`);
-
-    const calls = await CallUserList.find({
-      propertyPhoneNumber: { $regex: phoneRegex },
-      status: 'calledUser',
-    }).sort({ createdAt: -1 });
-
-    res.json(calls);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-router.get('/user-call/property-owner/:phoneNumber/count', async (req, res) => {
-  try {
-    const { phoneNumber } = req.params;
-
-    const lastTenDigits = phoneNumber.slice(-10);
-    const phoneRegex = new RegExp(`^(\\+91|91)?${lastTenDigits}$`);
-
-    const count = await CallUserList.countDocuments({
-      propertyPhoneNumber: { $regex: phoneRegex },
-      status: 'calledUser',
-    });
-
-    res.json({ count });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-
-router.patch('/user-call/soft-delete/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const callEntry = await CallUserList.findById(id);
-
-    if (!callEntry) {
-      return res.status(404).json({ error: 'Call entry not found' });
-    }
-
-    // ✅ Allow delete for all
-    callEntry.isDeleted = true;
-    await callEntry.save();
-
-    res.status(200).json({ message: 'Call entry soft deleted successfully', entry: callEntry });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-router.patch('/user-call/undo-delete/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const callEntry = await CallUserList.findById(id);
-    if (!callEntry) return res.status(404).json({ error: 'Call entry not found' });
-
-    callEntry.isDeleted = false;
-    await callEntry.save();
-
-    res.status(200).json({ message: 'Call entry restored', entry: callEntry });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-
-router.get('/get-all-user-call', async (req, res) => {
-  try {
-    const allCalls = await CallUserList.find().sort({ createdAt: -1 }); // Optional: Sort newest first
-    res.status(200).json(allCalls);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-
-// Permanently delete a user call entry by ID
-router.delete('/user-call/permanent-delete/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const deletedEntry = await CallUserList.findByIdAndDelete(id);
-
-    if (!deletedEntry) {
-      return res.status(404).json({ message: 'Call entry not found' });
-    }
-
-    res.status(200).json({ message: 'Call entry permanently deleted', deletedEntry });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-router.get("/user-last-10-days-views/:phoneNumber", async (req, res) => {
-  try {
-    const { phoneNumber } = req.params;
-
-    if (!phoneNumber) {
-      return res.status(400).json({ message: "Phone number is required" });
-    }
-
-    const digits = phoneNumber.replace(/\D/g, "").slice(-10);
-    const variants = [`+91${digits}, 91${digits}, digits`];
-
-    const userViews = await UserViewsModel.findOne({
-      phoneNumber: { $in: variants },
-    });
-
-    if (!userViews || !Array.isArray(userViews.viewedProperties)) {
-      return res.status(404).json({ message: "No viewed properties found" });
-    }
-
-    const now = new Date();
-    const tenDaysAgo = new Date();
-    tenDaysAgo.setDate(now.getDate() - 10);
-
-    const recentViews = userViews.viewedProperties
-      .filter((view) => {
-        const viewedAt = new Date(view.viewedAt);
-        return viewedAt >= tenDaysAgo && viewedAt <= now;
-      })
-      .sort((a, b) => new Date(b.viewedAt) - new Date(a.viewedAt));
-
-    if (recentViews.length === 0) {
-      return res
-        .status(404)
-        .json({ message: "No views in the last 10 days" });
-    }
-
-    const properties = await Promise.all(
-      recentViews.map(async (view) => {
-        const prop = await AddModel.findOne({ ppcId: view.ppcId });
-        return prop
-          ? {
-              ...prop.toObject(),
-              viewedAt: view.viewedAt,
-            }
-          : null;
-      })
-    );
-
-    const filteredProperties = properties.filter(Boolean);
-
-    return res.status(200).json({
-      message: "Viewed properties in the last 10 days",
-      properties: filteredProperties,
-    });
-  } catch (error) {
-    console.error("Error fetching viewed properties:", error);
-    res.status(500).json({ message: "Internal Server Error", error: error.message });
-  }
-});
-
-
-
-router.get("/user-get-all-last-views", async (req, res) => {
-  try {
-    const allUserViews = await UserViewsModel.find();
-
-    if (!allUserViews || allUserViews.length === 0) {
-      return res.status(404).json({ message: "No user views found" });
-    }
-
-    const result = [];
-
-    for (const user of allUserViews) {
-      if (user.viewedProperties.length === 0) continue;
-
-      // Sort by viewedAt descending
-      const sortedViews = user.viewedProperties.sort(
-        (a, b) => new Date(b.viewedAt) - new Date(a.viewedAt)
-      );
-
-      const lastViewed = sortedViews[0];
-
-      const property = await AddModel.findOne({ ppcId: lastViewed.ppcId });
-
-      if (property) {
-        result.push({
-          phoneNumber: user.phoneNumber,
-          property,
-          viewedAt: lastViewed.viewedAt,
-        });
-      }
-    }
-
-    return res.status(200).json(result);
-  } catch (error) {
-    console.error("Error fetching all last viewed properties:", error);
-    res.status(500).json({ message: "Internal Server Error", error: error.message });
-  }
-});
 
 // ✅ PUT: Update a call entry by ID
 router.put('/update-call/:id', async (req, res) => {
@@ -483,7 +277,8 @@ router.get("/user-get-views/:phoneNumber", async (req, res) => {
 });
 
 
-router.get("/user-last-5-views/:phoneNumber", async (req, res) => {
+
+router.get("/user-last-10-days-views/:phoneNumber", async (req, res) => {
   try {
     const { phoneNumber } = req.params;
 
@@ -511,8 +306,7 @@ router.get("/user-last-5-views/:phoneNumber", async (req, res) => {
         const viewedAt = new Date(view.viewedAt);
         return viewedAt >= tenDaysAgo && viewedAt <= now;
       })
-      .sort((a, b) => new Date(b.viewedAt) - new Date(a.viewedAt))
-      .slice(0, 5);
+      .sort((a, b) => new Date(b.viewedAt) - new Date(a.viewedAt));
 
     if (recentViews.length === 0) {
       return res
@@ -535,13 +329,52 @@ router.get("/user-last-5-views/:phoneNumber", async (req, res) => {
     const filteredProperties = properties.filter(Boolean);
 
     return res.status(200).json({
-      message: "Last 5 viewed properties in the last 10 days",
+      message: "Viewed properties in the last 10 days",
       properties: filteredProperties,
     });
   } catch (error) {
-    res
-      .status(500)
-      .json({ message: "Internal Server Error", error: error.message });
+    res.status(500).json({ message: "Internal Server Error", error: error.message });
+  }
+});
+
+
+// Endpoint to count the views in the last 10 days
+router.get("/user-view-count/:phoneNumber", async (req, res) => {
+  try {
+    const { phoneNumber } = req.params;
+
+    if (!phoneNumber) {
+      return res.status(400).json({ message: "Phone number is required" });
+    }
+
+    const digits = phoneNumber.replace(/\D/g, "").slice(-10);
+    const variants = [`+91${digits}`, `91${digits}`, digits];
+
+    // Fetch user views data
+    const userViews = await UserViewsModel.findOne({
+      phoneNumber: { $in: variants },
+    });
+
+    if (!userViews || !Array.isArray(userViews.viewedProperties)) {
+      return res.status(404).json({ message: "No viewed properties found" });
+    }
+
+    const now = new Date();
+    const tenDaysAgo = new Date();
+    tenDaysAgo.setDate(now.getDate() - 10);
+
+    // Filter views in the last 10 days
+    const recentViews = userViews.viewedProperties.filter((view) => {
+      const viewedAt = new Date(view.viewedAt);
+      return viewedAt >= tenDaysAgo && viewedAt <= now;
+    });
+
+    return res.status(200).json({
+      message: `View count in the last 10 days for ${phoneNumber}`,
+      viewCount: recentViews.length,
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Internal Server Error", error: error.message });
   }
 });
 
@@ -646,6 +479,28 @@ router.post("/user-viewed-property", async (req, res) => {
   }
 });
 
+
+router.get("/user-views-count", async (req, res) => {
+  try {
+    // Aggregate total number of views from all user documents
+    const result = await UserViewsModel.aggregate([
+      { $unwind: "$viewedProperties" },
+      { $count: "totalViews" }
+    ]);
+
+    const totalViews = result[0]?.totalViews || 0;
+
+    res.status(200).json({
+      message: "Total user property views fetched successfully",
+      count: totalViews,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Error fetching user views count",
+      error: error.message,
+    });
+  }
+});
 
 
 router.get("/user-viewed-properties", async (req, res) => {
@@ -1058,6 +913,45 @@ try {
 );
 
 
+router.get('/fetch-property-dropdowns', async (req, res) => {
+  try {
+    const [propertyModes] = await Promise.all([
+      AddModel.distinct('propertyMode', { propertyMode: { $ne: null } }),
+    ]);
+
+    res.status(200).json({
+      message: 'Property dropdown values fetched successfully',
+      propertyModes,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: 'Error fetching dropdown values',
+      error: error.message,
+    });
+  }
+});
+
+
+router.get('/fetch-property-dropdowns', async (req, res) => {
+  try {
+    const [ propertyTypes] = await Promise.all([
+      AddModel.distinct('propertyType', { propertyType: { $ne: null } })
+    ]);
+
+    res.status(200).json({
+      message: 'Property dropdown values fetched successfully',
+      propertyModes,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: 'Error fetching dropdown values',
+      error: error.message,
+    });
+  }
+});
+
+
+
 
 router.post('/add-property', upload.fields([{ name: 'video', maxCount: 1 }, { name: 'photos', maxCount: 5 }]), async (req, res) => {
   try {
@@ -1128,6 +1022,38 @@ router.get('/all-properties-count', async (req, res) => {
       res.status(500).json({ error: error.message });
   }
 });
+
+
+router.get('/deleted-properties-count', async (req, res) => {
+  try {
+    // Count the documents with status "delete"
+    const count = await AddModel.countDocuments({ status: "delete" });
+
+    // Check if the count is being returned as expected
+    if (count >= 0) {
+      res.json({ deletedProperties: count });
+    } else {
+      res.status(404).json({ message: "No deleted properties found" });
+    }
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/pending-properties-count', async (req, res) => {
+  try {
+    // Count the documents with status "pending"
+    const count = await AddModel.countDocuments({ status: "pending" });
+
+    // Send the count as response
+    res.json({ pendingProperties: count });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+
+
 
 
 // Fetch interest buyer count
@@ -1332,7 +1258,6 @@ router.get('/get-contact-buyer-count', async (req, res) => {
   }
 });
 
-
 router.get('/get-help-as-owner-count', async (req, res) => {
   const { phoneNumber } = req.query;
 
@@ -1447,7 +1372,6 @@ router.get('/get-reportproperty-buyer-count', async (req, res) => {
 });
 
 
-
 router.get('/get-reportproperty-owner-count', async (req, res) => {
   const { phoneNumber } = req.query;
 
@@ -1522,7 +1446,6 @@ router.get('/get-soldout-buyer-count', async (req, res) => {
       return res.status(500).json({ message: 'Internal Server Error', error: error.message });
   }
 });
-
 
 
 router.get('/get-soldout-owner-count', async (req, res) => {
@@ -1864,6 +1787,23 @@ router.get('/zero-view-properties', async (req, res) => {
       return res.status(500).json({ message: 'Internal Server Error', error: error.message });
   }
 });
+
+router.get('/zero-view-properties-count', async (req, res) => {
+  try {
+    const count = await AddModel.countDocuments({ views: { $eq: 0 } });
+
+    res.status(200).json({
+      message: 'Zero viewed property count fetched successfully',
+      count,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: 'Error fetching zero viewed property count',
+      error: error.message,
+    });
+  }
+});
+
 
 router.delete('/delete-viewed-property/:ppcId', async (req, res) => {
   const { ppcId } = req.params;
@@ -2235,6 +2175,7 @@ router.get('/fetch-data', async (req, res) => {
 
 
 
+
 router.get('/fetch-all-datas', async (req, res) => {
     try {
 
@@ -2297,12 +2238,13 @@ router.get("/fetch-Pudhucherry-properties", async (req, res) => {
 
 
 
+
 // Route: GET /fetch-active-users
 router.get('/fetch-active-users', async (req, res) => {
   try {
     // Fetch users with specific statuses
     const users = await AddModel.find({
-      status: { $in: ['active', 'delete', 'complete', 'contact'] }
+      status: { $in: ['active', 'delete', 'contact'] }
     });
 
     // Respond with the fetched users
@@ -2815,6 +2757,38 @@ router.get("/fetch-featured-properties", async (req, res) => {
   }
 });
 
+
+router.get('/properties/deleted', async (req, res) => {
+  try {
+    const deletedProperties = await AddModel.find({ status: 'delete' });
+
+    res.status(200).json({
+      message: 'Deleted properties fetched successfully.',
+      data: deletedProperties,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: 'Error fetching deleted properties.',
+      error: error.message,
+    });
+  }
+});
+
+router.get('/properties/pending', async (req, res) => {
+  try {
+    const pendingProperties = await AddModel.find({ status: 'pending' });
+
+    res.status(200).json({
+      message: 'Pending properties fetched successfully.',
+      data: pendingProperties,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: 'Error fetching pending properties.',
+      error: error.message,
+    });
+  }
+});
 
 
 module.exports = router;

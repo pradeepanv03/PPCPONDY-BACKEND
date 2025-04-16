@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const AdminLogin = require('../Admin/AdminModel')
+const ProfileData = require("../MyProfile/ProfileModel");
 
 
 
@@ -29,8 +30,6 @@ router.post('/adminlogin', async (req, res) => {
 });
 
 
-
-// Create a new user
 router.post('/admin-create', async (req, res) => {
     const newUser = new AdminLogin({
         name: req.body.name,

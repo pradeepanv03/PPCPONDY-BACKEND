@@ -124,7 +124,6 @@ router.post('/store-plan', async (req, res) => {
 });
 
 
-
 router.post("/select-plan", async (req, res) => {
     const { phoneNumber, planId } = req.body;
 
@@ -158,8 +157,8 @@ router.post("/select-plan", async (req, res) => {
 
             const notification = await NotificationUser.create({
                 recipientPhoneNumber: phoneNumber,
-                senderPhoneNumber: phoneNumber, // since the user is selecting the plan for themselves
-                ppcId: "PLAN-" + planId, // using a pseudo ppcId for tracking
+                senderPhoneNumber: phoneNumber,
+                ppcId: "PLAN-" + planId,
                 message: `A new plan has been selected by ${phoneNumber}.`,
                 createdAt: new Date()
             });
@@ -364,12 +363,11 @@ router.get('/get-new-plan', async (req, res) => {
 
 
 
-
-  router.get('/expiring-soon', async (req, res) => {
+router.get('/expiring-soon', async (req, res) => {
     try {
         const currentDate = new Date();
         const expiringDate = new Date();
-        expiringDate.setDate(currentDate.getDate() + 5); // 5 days before expiry
+        expiringDate.setDate(currentDate.getDate() + 5); // Adjust this as needed (e.g., 5 days before expiry)
 
         const expiringPlans = await PricingPlans.find({
             status: 'active',
@@ -381,7 +379,18 @@ router.get('/get-new-plan', async (req, res) => {
             }
         });
 
-        return res.status(200).json(expiringPlans);
+        if (expiringPlans.length > 0) {
+            return res.status(200).json({
+                success: true,
+                message: "Some plans are expiring soon.",
+                expiringPlans
+            });
+        } else {
+            return res.status(200).json({
+                success: true,
+                message: "No plans are expiring soon."
+            });
+        }
     } catch (error) {
         return res.status(500).json({ message: 'Error retrieving expiring plans.', error: error.message });
     }
@@ -402,11 +411,23 @@ router.get('/expired-plans', async (req, res) => {
             }
         });
 
-        return res.status(200).json(expiredPlans);
+        if (expiredPlans.length > 0) {
+            return res.status(200).json({
+                success: true,
+                message: "Some plans have expired.",
+                expiredPlans
+            });
+        } else {
+            return res.status(200).json({
+                success: true,
+                message: "No plans have expired."
+            });
+        }
     } catch (error) {
         return res.status(500).json({ message: 'Error retrieving expired plans.', error: error.message });
     }
 });
+
 
 
 router.put('/update-expired-plans', async (req, res) => {

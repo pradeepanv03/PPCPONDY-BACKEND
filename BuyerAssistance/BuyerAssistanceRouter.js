@@ -1,16 +1,87 @@
 
 
-
-
-
-
-
 const express = require("express");
 const router = express.Router();
 const BuyerAssistance = require("../BuyerAssistance/BuyerAssistanceModel");
 const AddModel = require('../AddModel');
 const NotificationUser = require('../Notification/NotificationDetailModel');
 
+router.post('/contact-buyer-send', async (req, res) => {
+  const { phoneNumber, ba_id } = req.body;
+
+  try {
+    // Search by ba_id as a number
+    const buyer = await BuyerAssistance.findOne({ ba_id });
+
+    if (!buyer) {
+      return res.status(404).json({ success: false, message: 'Buyer entry not found' });
+    }
+
+    const updatedBuyer = await BuyerAssistance.findOneAndUpdate(
+      { ba_id },  // Use ba_id in the query
+      {
+        $set: { callStatus: 'contacted', updatedAt: new Date() },
+        $push: { callLogs: { phoneNumber, createdAt: new Date() } }
+      },
+      { new: true }
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: 'Buyer contacted successfully!',
+      buyerDetails: {
+        buyerName: updatedBuyer.baName,
+        phoneNumber: updatedBuyer.phoneNumber,
+        ppcId: updatedBuyer.ppcId,
+        status: updatedBuyer.callStatus
+      }
+    });
+
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Server Error', error: error.message });
+  }
+});
+
+
+router.get("/buyer-assistance-interests-phone", async (req, res) => {
+  try {
+    const { phone } = req.query;
+    const filter = { ba_status: "buyer-assistance-interest" };
+    if (phone) filter.interestedUserPhone = phone;
+
+    const assistanceInterests = await BuyerAssistance.find(filter);
+
+    if (!assistanceInterests.length) {
+      return res.status(404).json({ message: "No buyer assistance interests found" });
+    }
+
+    res.status(200).json({
+      message: "Buyer assistance interests fetched successfully",
+      data: assistanceInterests,
+    });
+
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error });
+  }
+});
+
+// Count buyer assistance interests for a phone number
+router.get("/buyer-assistance-interests-phone/count", async (req, res) => {
+  try {
+    const { phone } = req.query;
+    const filter = { ba_status: "buyer-assistance-interest" };
+    if (phone) filter.interestedUserPhone = phone;
+
+    const count = await BuyerAssistance.countDocuments(filter);
+
+    res.status(200).json({
+      message: "Buyer assistance interest count fetched successfully",
+      count,
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error });
+  }
+});
 
 router.get("/matched-properties-by-phone/:phoneNumber", async (req, res) => {
   try {
@@ -119,6 +190,9 @@ router.get("/get-buyer-id/:phoneNumber", async (req, res) => {
 });
 
 
+
+
+
 router.post("/add-buyerAssistance", async (req, res) => {
   try {
     const { phoneNumber } = req.body;
@@ -137,7 +211,7 @@ router.post("/add-buyerAssistance", async (req, res) => {
     if (existingUser) {
       newBaId = existingUser.ba_id; // Reuse existing ba_id
     } else {
-      // Find the latest ba_id
+      // Find the latest `ba_id`
       let lastRecord = await BuyerAssistance.findOne({}, { ba_id: 1 }).sort({ ba_id: -1 });
 
       if (lastRecord && lastRecord.ba_id) {
@@ -159,7 +233,7 @@ router.post("/add-buyerAssistance", async (req, res) => {
 
     // ✅ Create notification (assume admin/support team uses "admin" as phone number)
     await NotificationUser.create({
-      recipientPhoneNumber: "admin", // Could be a group inbox, admin panel, or even dynamic
+      recipientPhoneNumber: phoneNumber, // Could be a group inbox, admin panel, or even dynamic
       senderPhoneNumber: formattedPhoneNumber,
       message: `New buyer assistance request submitted by ${formattedPhoneNumber}`,
       createdAt: new Date(),
@@ -175,6 +249,95 @@ router.post("/add-buyerAssistance", async (req, res) => {
   }
 });
 
+router.get("/buyer-assistance-count", async (req, res) => {
+  try {
+    const count = await BuyerAssistance.countDocuments();
+    res.status(200).json({
+      message: "Total buyer assistance count fetched successfully",
+      count,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Error fetching buyer assistance count",
+      error: error.message,
+    });
+  }
+});
+
+
+router.post('/get-matched-property', async (req, res) => {
+  try {
+    const { ba_id, phoneNumber } = req.body;
+
+    // Validate that either ba_id or phoneNumber is provided
+    if (!ba_id && !phoneNumber) {
+      return res.status(400).json({ success: false, message: "Either ba_id or phoneNumber must be provided" });
+    }
+
+    // Fetch Buyer Assistance data based on ba_id or phoneNumber
+    let buyerAssistance = null;
+    if (ba_id) {
+      buyerAssistance = await BuyerAssistance.findOne({ ba_id });
+    } else if (phoneNumber) {
+      buyerAssistance = await BuyerAssistance.findOne({ phoneNumber });
+    }
+
+    if (!buyerAssistance) {
+      return res.status(404).json({ success: false, message: "Buyer Assistance data not found" });
+    }
+
+    // Now match property using the phoneNumber from the Buyer Assistance data
+    const matchedProperty = await AddModel.findOne({ phoneNumber: buyerAssistance.phoneNumber });
+
+    if (!matchedProperty) {
+      return res.status(404).json({ success: false, message: "Property not found for this buyer" });
+    }
+
+    // You can return the matched property data along with buyer assistance details
+    return res.status(200).json({
+      success: true,
+      message: "Matched property found",
+      matchedBuyerAssistance: {
+        ba_id: buyerAssistance.ba_id,
+        baName: buyerAssistance.baName,
+        phoneNumber: buyerAssistance.phoneNumber,
+        city: buyerAssistance.city,
+        area: buyerAssistance.area,
+        minPrice: buyerAssistance.minPrice,
+        maxPrice: buyerAssistance.maxPrice,
+        propertyType: buyerAssistance.propertyType,
+        propertyMode: buyerAssistance.propertyMode,
+      },
+      matchedProperty: {
+        ppcId: matchedProperty.ppcId,
+        price: matchedProperty.price,
+        status: matchedProperty.status,
+        areaUnit: matchedProperty.areaUnit,
+        totalArea: matchedProperty.totalArea,
+        propertyMode: matchedProperty.propertyMode,
+        propertyType: matchedProperty.propertyType,
+        facing: matchedProperty.facing,
+        city: matchedProperty.city,
+        district: matchedProperty.district,
+        area: matchedProperty.area,
+        email: matchedProperty.email,
+        phoneNumber: matchedProperty.phoneNumber,
+        ownerName: matchedProperty.ownerName,
+        photos: matchedProperty.photos,
+        video: matchedProperty.video,
+        createdAt: matchedProperty.createdAt,
+        updatedAt: matchedProperty.updatedAt,
+      }
+    });
+
+  } catch (error) {
+    return res.status(500).json({ success: false, message: "Server Error", error: error.message });
+  }
+});
+
+
+
+// Get All Buyer Assistance Requests
 router.get("/get-buyerAssistance", async (req, res) => {
   try {
     const requests = await BuyerAssistance.find({});
@@ -187,6 +350,23 @@ router.get("/get-buyerAssistance", async (req, res) => {
   }
 });
 
+// Get Buyer Assistance Requests by Phone Number
+router.get("/get-buyerAssistance/:phoneNumber", async (req, res) => {
+  const { phoneNumber } = req.params;
+
+  try {
+    const requests = await BuyerAssistance.find({ phoneNumber });
+    res.status(200).json({
+      message: `Buyer Assistance requests fetched for phone number: ${phoneNumber}`,
+      data: requests,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Error fetching Buyer Assistance requests by phone number",
+      error,
+    });
+  }
+});
 
 
 // Update Buyer Assistance
@@ -201,6 +381,26 @@ router.put("/update-buyerAssistance/:id", async (req, res) => {
     res.status(500).json({ message: "Error updating Buyer Assistance request", error });
   }
 });
+
+// Delete Buyer Assistance
+router.delete("/delete-buyerAssistance/:id", async (req, res) => {
+  try {
+    const deletedRequest = await BuyerAssistance.findByIdAndDelete(req.params.id);
+    if (!deletedRequest) {
+      return res.status(404).json({ message: "Request not found" });
+    }
+    res.status(200).json({
+      message: "Buyer Assistance request deleted successfully!",
+      data: deletedRequest,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Error deleting Buyer Assistance request",
+      error,
+    });
+  }
+});
+
 
 // Update Buyer Assistance using Phone Number
 router.put("/update-buyerAssistance-phone/:phoneNumber", async (req, res) => {
@@ -328,7 +528,6 @@ router.get("/fetch-matched-properties", async (req, res) => {
 
 
 
-
 router.get("/fetch-buyer-matched-properties-by-phone", async (req, res) => {
   try {
     const { phoneNumber } = req.query;
@@ -380,6 +579,7 @@ router.get("/fetch-buyer-matched-properties-by-phone", async (req, res) => {
 });
 
 
+
 const normalizePhone = (phone) => {
   return phone.replace(/\D/g, "").slice(-10);
 };
@@ -408,7 +608,7 @@ router.get("/fetch-owner-matched-properties", async (req, res) => {
     let matchedProperties = [];
 
     for (let buyerRequest of buyerRequests) {
-
+  
 
       const properties = await AddModel.find({
         propertyMode: buyerRequest.propertyMode,
@@ -438,42 +638,47 @@ router.get("/fetch-owner-matched-properties", async (req, res) => {
 });
 
 
-router.get("/fetch-buyer-matched-properties", async (req, res) => {
+router.get("/fetch-matched-buyers-for-owner", async (req, res) => {
   try {
-    let { phoneNumber } = req.query;
+    const { phoneNumber } = req.query;
 
     if (!phoneNumber) {
       return res.status(400).json({ message: "Phone number is required" });
     }
 
-    const normalizedPhone = normalizePhone(phoneNumber);
+    const properties = await AddModel.find({ phoneNumber });
 
-    // Fetch a property posted by this user
-    const property = await AddModel.findOne({
-      phoneNumber: { $regex: new RegExp(`${normalizedPhone}$`, "i") }
-    });
-
-    if (!property) {
-      return res.status(404).json({ message: "No property found for this phone number" });
+    if (!properties.length) {
+      return res.status(404).json({ message: "No properties found for this owner" });
     }
 
 
-    // Fetch Buyer Assistance requests that match this property
-    const matchedBuyerRequests = await BuyerAssistance.find({
-      propertyMode: property.propertyMode,
-      propertyType: property.propertyType,
-      city: property.city,
-      area: property.area,
-      facing: property.facing
-    });
+    let allMatchedBuyers = [];
 
-    if (!matchedBuyerRequests.length) {
-      return res.status(404).json({ message: "No matching Buyer Assistance requests found" });
+    for (let property of properties) {
+      const conditions = {
+        propertyMode: property.propertyMode,
+        propertyType: property.propertyType,
+        city: property.city,
+        area: property.area,
+        facing: property.facing,
+        minPrice: { $lte: property.price },
+        maxPrice: { $gte: property.price }
+      };
+
+
+      const matchedBuyers = await BuyerAssistance.find(conditions);
+
+      allMatchedBuyers.push(...matchedBuyers);
+    }
+
+    if (!allMatchedBuyers.length) {
+      return res.status(404).json({ message: "No matched buyer assistance requests found" });
     }
 
     res.status(200).json({
-      message: "Matched Buyer Assistance requests fetched successfully!",
-      data: matchedBuyerRequests
+      message: "Buyer-Matched Assistance Requests fetched successfully!",
+      matchedBuyerRequests: allMatchedBuyers
     });
 
   } catch (error) {
@@ -520,6 +725,8 @@ router.get("/fetch-buyer-matched-properties/count", async (req, res) => {
 });
 
 
+
+
 router.get("/fetch-owner-matched-properties/count", async (req, res) => {
   try {
     let { phoneNumber } = req.query;
@@ -545,7 +752,7 @@ router.get("/fetch-owner-matched-properties/count", async (req, res) => {
     let matchedPropertyCount = 0;
 
     for (let buyerRequest of buyerRequests) {
-    
+   
 
       // Count Owner-Matched Properties
       const count = await AddModel.countDocuments({
@@ -826,7 +1033,6 @@ router.delete("/permanent-delete-buyer-assistance/:id", async (req, res) => {
     res.status(500).json({ message: "Server error", error });
   }
 });
-
 
 
 

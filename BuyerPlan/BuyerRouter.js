@@ -1,10 +1,5 @@
 
 
-
-
-
-
-
 const express = require('express');
 const BuyerPlan = require('../BuyerPlan/BuyerModel');
 const router = express.Router();

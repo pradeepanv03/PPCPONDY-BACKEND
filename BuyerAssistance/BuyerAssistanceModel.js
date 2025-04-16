@@ -1,4 +1,7 @@
-const mongoose = require("mongoose")
+const mongoose = require("mongoose");
+
+
+
 const BuyerAssistanceSchema = new mongoose.Schema({
   ba_id: { type: Number },  // Unique BA ID per user
   baName:{
@@ -29,7 +32,7 @@ const BuyerAssistanceSchema = new mongoose.Schema({
     type:String,
     required: true
   },
-  noOfBHK: {
+  bedrooms: {
     type:String,
   },
   propertyMode: {
@@ -54,8 +57,8 @@ const BuyerAssistanceSchema = new mongoose.Schema({
 
   ba_status:{
 type:String,
-ennum:["buyer-assiatance-interest","remove-assistance-interest"]
-  },
+enum:["buyer-assiatance-interest","remove-assistance-interest"]
+},
  
   paymentType: { type: String },
   description: String,

@@ -1,11 +1,11 @@
 
+
 const express = require("express");
 const router = express.Router();
 const PhotoRequest = require("../Photo/PhotoRequestModel");
 const Property = require("../AddModel"); // Ensure correct path
 const AddModel = require("../AddModel");
 const NotificationUser = require('../Notification/NotificationDetailModel');
-
 
 
 
@@ -45,10 +45,6 @@ const upload = multer({
 });
 
 
-
-
-
-// ✅ Fetch All Photo Requests
 router.get("/photo-requests", async (req, res) => {
   try {
     const photoRequests = await PhotoRequest.find().lean();
@@ -93,9 +89,6 @@ const getPhotoRequest = async (req, res) => {
 
 // Define the route
 router.get("/photos/get/:ppcId/:requesterPhoneNumber", getPhotoRequest);
-
-
-
 
 
 
@@ -145,9 +138,6 @@ router.get("/photos/get-all", async (req, res) => {
     res.status(500).json({ message: "Error fetching photo requests.", error: error.message });
   }
 });
-
-
-
 
 
 router.post("/photo-request", async (req, res) => {
@@ -214,10 +204,8 @@ router.post("/photo-request", async (req, res) => {
   }
 });
 
- 
 
 
-// ✅ Function to normalize phone numbers
 function normalizePhoneNumber(phoneNumber) {
     phoneNumber = phoneNumber.replace(/\D/g, ""); // Remove non-numeric characters
     if (phoneNumber.startsWith("91") && phoneNumber.length === 12) {
@@ -586,6 +574,7 @@ router.put("/photo-requests/delete/:ppcId", async (req, res) => {
 });
 
 
+
 router.put("/photo-requests/delete/:ppcId/:phoneNumber", async (req, res) => {
   try {
       const { ppcId, phoneNumber } = req.params;
@@ -662,6 +651,7 @@ router.put("/photo-requests/send/:ppcId", async (req, res) => {
   }
 });
 
+
 router.put("/photo-requests/reject/:ppcId", async (req, res) => {
   try {
     const { ppcId } = req.params;
@@ -683,7 +673,6 @@ router.put("/photo-requests/reject/:ppcId", async (req, res) => {
     res.status(500).json({ message: "Error rejecting photo request.", error: error.message });
   }
 });
-
 
 
 
@@ -722,7 +711,6 @@ router.put("/reject-photo-request", async (req, res) => {
         res.status(500).json({ message: "Internal Server Error", error: error.message });
     }
 });
-
 
 
 router.put("/accept-photo-request", async (req, res) => {
@@ -802,6 +790,7 @@ router.put("/accept-photorequest", async (req, res) => {
       res.status(500).json({ message: "Internal Server Error", error: error.message });
   }
 });
+
 
 
 router.put("/photos/edit/:id", async (req, res) => {

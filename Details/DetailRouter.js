@@ -4,6 +4,8 @@ const DetailSchema = require ('./DetailModel');
 const { updateSearchIndex } = require('../SendDataAdmin/DataModel');
 const NotificationUser = require('../Notification/NotificationDetailModel');
 const router = express.Router();
+const BuyerAssistance = require("../BuyerAssistance/BuyerAssistanceModel");
+
 
 const normalizePhoneNumber = (number) => {
     if (!number) return "";
@@ -80,6 +82,29 @@ router.post("/send-interests", async (req, res) => {
     } catch (error) {
         return res.status(500).json({
             message: "Internal Server Error",
+            error: error.message
+        });
+    }
+});
+
+
+router.get("/total-interest-count", async (req, res) => {
+    try {
+        // Aggregate all properties and sum the length of interestRequests arrays
+        const properties = await AddModel.find({});
+
+        // Calculate the total number of interest requests
+        const totalInterestCount = properties.reduce((total, property) => {
+            return total + property.interestRequests.length;
+        }, 0);
+
+        return res.status(200).json({
+            message: "Total interest count fetched successfully",
+            totalInterestCount
+        });
+    } catch (error) {
+        return res.status(500).json({
+            message: "Server Error",
             error: error.message
         });
     }
@@ -221,6 +246,8 @@ router.get("/get-user-notifications", async (req, res) => {
     }
   });
   
+
+  
   // DELETE /delete-notification/:id
 router.delete('/delete-notification/:id', async (req, res) => {
     try {
@@ -241,17 +268,36 @@ router.delete('/delete-notification/:id', async (req, res) => {
   });
   
 
+  // DELETE /delete-notification-by-time
+router.delete('/delete-notification-by-time', async (req, res) => {
+    try {
+      const { createdAt } = req.body;
+  
+      if (!createdAt) {
+        return res.status(400).json({ message: "createdAt timestamp is required." });
+      }
+  
+      const deletedNotification = await NotificationUser.findOneAndDelete({ createdAt: new Date(createdAt) });
+  
+      if (!deletedNotification) {
+        return res.status(404).json({ message: "Notification not found with the given timestamp." });
+      }
+  
+      res.status(200).json({ message: "Notification deleted successfully." });
+    } catch (error) {
+      res.status(500).json({ message: "Error deleting notification.", error: error.message });
+    }
+  });
   
 
-
-  router.get("/notification-user-count", async (req, res) => {
+router.get("/notification-unread-count", async (req, res) => {
     let { phoneNumber } = req.query;
   
     if (!phoneNumber) {
       return res.status(400).json({ message: "Phone number is required" });
     }
   
-    phoneNumber = phoneNumber.replace(/\D/g, ""); // Normalize phone number
+    phoneNumber = phoneNumber.replace(/\D/g, "");
   
     const variants = [
       "+91" + phoneNumber.slice(-10),
@@ -260,21 +306,27 @@ router.delete('/delete-notification/:id', async (req, res) => {
     ];
   
     try {
-      const count = await NotificationUser.countDocuments({
-        recipientPhoneNumber: { $in: variants }
+      const unreadNotifications = await NotificationUser.find({
+        recipientPhoneNumber: { $in: variants },
+        isRead: false,
+      });
+  
+      // Deduplicate by ppcId + message
+      const uniqueMap = new Map();
+      unreadNotifications.forEach((n) => {
+        const key = `${n.ppcId}_${n.message}`;
+        if (!uniqueMap.has(key)) uniqueMap.set(key, n);
       });
   
       return res.status(200).json({
-        message: "Notification count fetched successfully",
-        count
+        message: "Unique unread notification count fetched successfully",
+        count: uniqueMap.size,
       });
     } catch (error) {
       return res.status(500).json({ message: "Internal Server Error", error: error.message });
     }
   });
   
-  
-
 
 
 
@@ -550,7 +602,6 @@ router.get('/get-all-owners-and-buyers', async (req, res) => {
 
 
 
-
 router.post('/need-help', async (req, res) => {
     const { phoneNumber, ppcId } = req.body;
 
@@ -625,8 +676,6 @@ router.post('/need-help', async (req, res) => {
 });
 
 
-
-
 router.get('/get-help-as-buyer', async (req, res) => {
     try {
         let { postedPhoneNumber } = req.query;
@@ -690,7 +739,6 @@ router.get('/get-help-as-buyer', async (req, res) => {
 });
 
 
-
 const normalizePhoneFormats = (phone) => {
     const clean = phone.replace(/\D/g, ""); // remove non-digits
     return [clean, `+91${clean}`, `91${clean}`];
@@ -736,7 +784,8 @@ const normalizePhoneFormats = (phone) => {
               message: 'Help requests fetched successfully', 
               helpRequestsData 
           });
-      } catch (error) {          return res.status(500).json({ message: 'Internal Server Error', error: error.message });
+      } catch (error) {
+          return res.status(500).json({ message: 'Internal Server Error', error: error.message });
       }
   });
   
@@ -829,8 +878,6 @@ router.delete('/delete-help/:ppcId', async (req, res) => {
 
 
 
-
-
 router.post('/contact', async (req, res) => {
     const { phoneNumber, ppcId } = req.body;
   
@@ -868,7 +915,7 @@ router.post('/contact', async (req, res) => {
           recipientPhoneNumber: postedUserPhoneNumber,
           senderPhoneNumber: phoneNumber,
           ppcId,
-          message:` User ${phoneNumber} requested contact for your property.`,
+          message: `User ${phoneNumber} requested contact for your property.`,
           createdAt: new Date()
         });
       } catch (notifErr) {
@@ -897,6 +944,107 @@ router.post('/contact', async (req, res) => {
       return res.status(500).json({ success: false, message: 'Server Error', error: error.message });
     }
   });
+
+
+  router.post('/contact-send', async (req, res) => {
+    const { phoneNumber } = req.body;
+  
+    try {
+      // Find the property where the owner has the given phone number
+      const property = await AddModel.findOne({ phoneNumber });
+  
+      if (!property) {
+        return res.status(404).json({ success: false, message: 'Property not found for this phone number' });
+      }
+  
+      const postedUserPhoneNumber = property.phoneNumber;
+      const {
+        propertyMode, propertyType, price, area, email,
+        bestTimeToCall, ownerName, status, photos = [], ppcId
+      } = property;
+  
+      // Update the property with a new contact request
+      const updatedProperty = await AddModel.findOneAndUpdate(
+        { phoneNumber },
+        {
+          $push: { contactRequests: { phoneNumber, createdAt: new Date() } },
+          $set: { status: 'contact', updatedAt: new Date() },
+          $inc: { views: 1 }
+        },
+        { new: true }
+      );
+  
+      // Save a notification to the owner
+      try {
+        await NotificationUser.create({
+          recipientPhoneNumber: postedUserPhoneNumber,
+          senderPhoneNumber: phoneNumber,
+          ppcId,
+          message: `User ${phoneNumber} requested contact for your property.`,
+          createdAt: new Date()
+        });
+      } catch (notifErr) {
+      }
+  
+      return res.status(200).json({
+        success: true,
+        message: 'Contact request sent!',
+        postedUserPhoneNumber,
+        email,
+        propertyMode,
+        propertyType,
+        price,
+        area,
+        bestTimeToCall,
+        ownerName,
+        status: updatedProperty.status,
+        photos,
+        views: updatedProperty.views,
+        contactRequests: updatedProperty.contactRequests,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
+  
+    } catch (error) {
+      return res.status(500).json({ success: false, message: 'Server Error', error: error.message });
+    }
+  });
+  
+  router.get('/total-contact-count', async (req, res) => {
+    try {
+      // Aggregate total contact requests for all properties using contactRequests field
+      const contactCount = await AddModel.aggregate([
+        { $unwind: "$contactRequests" },
+        { $group: { _id: null, totalContactRequests: { $sum: 1 } } }
+      ]);
+  
+      // Aggregate total contact-send requests (assuming similar field)
+      const contactSendCount = await AddModel.aggregate([
+        { $match: { contactRequests: { $ne: [] } } }, // Filter properties with contact requests
+        { $project: { contactRequests: 1 } },
+        { $unwind: "$contactRequests" },
+        { $group: { _id: null, totalContactSendRequests: { $sum: 1 } } }
+      ]);
+  
+      // Get total counts from the result
+      const totalContactRequests = contactCount[0]?.totalContactRequests || 0;
+      const totalContactSendRequests = contactSendCount[0]?.totalContactSendRequests || 0;
+  
+      // Calculate total contact count
+      const totalContactCount = totalContactRequests + totalContactSendRequests;
+  
+      res.status(200).json({
+        success: true,
+        totalContactRequests,
+        totalContactSendRequests,
+        totalContactCount,
+      });
+  
+    } catch (error) {
+      return res.status(500).json({ success: false, message: 'Server Error', error: error.message });
+    }
+  });
+  
 
 
 router.get("/get-contact-buyer", async (req, res) => {
@@ -1136,7 +1284,6 @@ router.delete('/delete-contact/:ppcId', async (req, res) => {
 });
 
 
-
 router.post('/report-property', async (req, res) => {
     const { phoneNumber, ppcId, reportReason } = req.body;
 
@@ -1207,7 +1354,6 @@ router.post('/report-property', async (req, res) => {
         return res.status(500).json({ message: 'Internal Server Error', error: error.message });
     }
 });
-
 
 
 
@@ -1329,6 +1475,7 @@ router.put("/reportproperty/undo/:ppcId/:phoneNumber", async (req, res) => {
         res.status(500).json({ message: "Error restoring report request.", error: error.message });
     }
 });
+
 
 router.get('/get-reportproperty-owner', async (req, res) => {
     const { phoneNumber } = req.query;
@@ -1458,8 +1605,6 @@ router.delete('/delete-report/:ppcId', async (req, res) => {
         return res.status(500).json({ message: 'Internal Server Error', error: error.message });
     }
 });
-
-
 
 
 
@@ -1599,6 +1744,8 @@ router.get('/get-soldout-buyer', async (req, res) => {
 });
 
 
+
+
 router.put("/soldout/delete/:ppcId/:phoneNumber", async (req, res) => {
     try {
         const { ppcId, phoneNumber } = req.params;
@@ -1658,6 +1805,8 @@ router.put("/soldout/undo/:ppcId/:phoneNumber", async (req, res) => {
         res.status(500).json({ message: "Error restoring sold-out request.", error: error.message });
     }
 });
+
+
 
 
 router.get('/get-soldout-owner', async (req, res) => {
@@ -1789,7 +1938,6 @@ router.delete('/delete-soldout/:ppcId', async (req, res) => {
         return res.status(500).json({ message: 'Internal Server Error', error: error.message });
     }
 });
-
 
 
 
@@ -1949,10 +2097,6 @@ router.get("/favorite-history/:phoneNumber", async (req, res) => {
 
 
 
-
-
-
-
 router.get("/favorite-removed-buyer/:phoneNumber", async (req, res) => {
     const { phoneNumber } = req.params;
 
@@ -2041,9 +2185,7 @@ router.get("/remove-favorite-buyer", async (req, res) => {
             photos: property.photos || [],
             postedUserPhoneNumber: property.phoneNumber, // Property owner's phone number
             propertyDetails: property.propertyDetails || {}, // Property details
-            // favoritedUsersPhoneNumbers: (property.favoriteRequests || []) // Ensure it's an array
-            //     .filter(req => req.phoneNumber) // Remove empty/null entries
-            //     .map(req => req.phoneNumber), // Get phone numbers
+       
             removedFavoriteUserPhoneNumbers: (property.favoriteRemoved || []) // Ensure it's an array
                 .map(fav => ({
                     phoneNumber: fav.phoneNumber,
@@ -2177,9 +2319,6 @@ router.put("/favoriteRemoved/undo/:ppcId/:favoriteUserPhone", async (req, res) =
         return res.status(500).json({ message: "Internal Server Error", error: error.message });
     }
 });
-
-
-
 
 
 router.get('/get-favorite-owner', async (req, res) => {
@@ -2370,7 +2509,6 @@ router.get('/get-all-favorite-requests', async (req, res) => {
             propertyType: property.propertyType, // House/Apartment
             price: property.price, // Property price
             area: property.area,
-            // ownerName: property.ownerName || 'Unknown', // Fallback if owner name is missing
             views: property.views || 0, // Default views to 0 if missing
             createdAt: property.createdAt,
             updatedAt: property.updatedAt,

@@ -1,11 +1,6 @@
 
-
-
-
-
 const mongoose = require('mongoose');
 
-// User schema with additional fields
 const AdminLoginSchema = mongoose.Schema({
     name: {
         type: String,

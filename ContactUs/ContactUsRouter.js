@@ -1,17 +1,10 @@
 
-
-
-
-
 const express = require('express');
 const Contact = require('./ContactUsModel'); // Import Contact model
 
 const router = express.Router();
 
-/**
- * @route POST /contactUs
- * @desc Create a new contact entry
- */
+
 router.post('/contactUs', async (req, res) => {
     try {
         const { name, email, phoneNumber, message } = req.body;
@@ -31,10 +24,7 @@ router.post('/contactUs', async (req, res) => {
     }
 });
 
-/**
- * @route GET /contactUs
- * @desc Get all contacts
- */
+
 router.get('/all-contactUs', async (req, res) => {
     try {
         const contacts = await Contact.find();
@@ -44,10 +34,7 @@ router.get('/all-contactUs', async (req, res) => {
     }
 });
 
-/**
- * @route GET /contactUs/:id
- * @desc Get a single contact by ID
- */
+
 router.get('/get-contactUs/:id', async (req, res) => {
     try {
         const contact = await Contact.findById(req.params.id);
@@ -60,10 +47,6 @@ router.get('/get-contactUs/:id', async (req, res) => {
     }
 });
 
-/**
- * @route PUT /contactUs/:id
- * @desc Update a contact by ID
- */
 
 router.put('/update-contactUs/:id', async (req, res) => {
     try {
@@ -90,10 +73,7 @@ router.put('/update-contactUs/:id', async (req, res) => {
     }
 });
 
-/**
- * @route DELETE /contactUs/:id
- * @desc Delete a contact by ID
- */
+
 router.delete('/delete-contactUs/:id', async (req, res) => {
     try {
         const deletedContact = await Contact.findByIdAndDelete(req.params.id);

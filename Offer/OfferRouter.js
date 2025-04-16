@@ -6,7 +6,6 @@ const AddModel = require('../AddModel');
 const NotificationUser = require('../Notification/NotificationDetailModel');
 
 
-
 router.get("/offers/owner/:phoneNumber", async (req, res) => {
     try {
         let { phoneNumber } = req.params;
@@ -16,12 +15,12 @@ router.get("/offers/owner/:phoneNumber", async (req, res) => {
 
         // Prepare possible phone number formats
         const phoneVariants = [
-            phoneNumber,            // 9876543210
-            `91${phoneNumber}`,     // 919876543210
-            `+91${phoneNumber}`     // +919876543210
+            phoneNumber,           
+            `91${phoneNumber}`,     
+            `+91${phoneNumber}`     
         ];
 
-
+        
         // Find all offers by this buyer's phone number
         const buyerOffers = await Offer.find({ phoneNumber: { $in: phoneVariants } });
 
@@ -69,7 +68,6 @@ router.get("/offers/owner/:phoneNumber", async (req, res) => {
 });
 
 
-
 router.get("/offers/owner/count/:phoneNumber", async (req, res) => {
     try {
         let { phoneNumber } = req.params;
@@ -96,7 +94,6 @@ router.get("/offers/owner/count/:phoneNumber", async (req, res) => {
         });
     }
 });
-
 
 
 router.post('/offer', async (req, res) => {
@@ -179,7 +176,6 @@ router.post('/offer', async (req, res) => {
         res.status(500).json({ message: "Error processing offer", error: error.message });
     }
 });
-
 
 
 
@@ -563,6 +559,7 @@ router.put("/reject-offer", async (req, res) => {
         res.status(500).json({ message: "Internal Server Error", error: error.message });
     }
 });
+
 
   
   // Fetch Single Offer by ID

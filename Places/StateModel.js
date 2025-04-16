@@ -1,4 +1,3 @@
-// Places/StateModel.js
 
 const mongoose = require('mongoose');
 

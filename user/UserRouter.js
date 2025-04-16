@@ -22,6 +22,7 @@ const formatPhoneNumber = (phone, countryCode) => {
   return `${countryCode}${phone}`;
 };
 
+
 router.post('/user/register', async (req, res) => {
   const { phone, countryCode = '+91', mode = 'web' } = req.body;
 
@@ -89,6 +90,63 @@ router.post('/user/register', async (req, res) => {
     return res.status(500).json({ message: 'Something went wrong', error: error.message });
   }
 });
+
+router.get('/user/login-mode-count', async (req, res) => {
+  try {
+    // Make sure you're using the exact case stored in the DB ('web' or 'app')
+    const webLoginCount = await UserLogin.countDocuments({ loginMode: { $regex: /^web$/, $options: 'i' } });
+    const appLoginCount = await UserLogin.countDocuments({ loginMode: { $regex: /^app$/, $options: 'i' } });
+
+    return res.status(200).json({
+      message: 'Login mode counts fetched successfully',
+      webLoginCount,
+      appLoginCount
+    });
+  } catch (error) {
+    console.error("Error fetching login mode counts:", error);
+    return res.status(500).json({
+      message: 'Server Error',
+      error: error.message
+    });
+  }
+});
+
+router.get('/user/login-mode-counts', async (req, res) => {
+  try {
+    const [webLoginCount, appLoginCount] = await Promise.all([
+      UserLogin.countDocuments({ loginMode: { $regex: /^web$/, $options: 'i' } }),
+      UserLogin.countDocuments({ loginMode: { $regex: /^app$/, $options: 'i' } })
+    ]);
+
+    res.status(200).json({
+      message: "Login mode counts fetched successfully",
+      webLoginCount,
+      appLoginCount
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Something went wrong",
+      error: error.message
+    });
+  }
+});
+
+
+router.get('/user/login-count', async (req, res) => {
+  try {
+    // Count users with a non-null loginDate and are not banned, deleted, or permanently logged out
+    const count = await UserLogin.countDocuments({
+      loginDate: { $ne: null },
+      status: { $nin: ['banned', 'deleted'] },
+      permanentlyLoggedOut: { $ne: true }
+    });
+
+    res.status(200).json({ message: 'Login user count fetched successfully', count });
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching login user count', error: error.message });
+  }
+});
+
 
 router.post('/user/permanent-logout', async (req, res) => {
   const { phone } = req.body;

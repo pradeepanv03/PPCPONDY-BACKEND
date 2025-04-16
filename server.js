@@ -7,6 +7,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
 
+const AddRouters = require('./AddRouters'); 
 const AddRouter = require('./AddRouter'); 
 const PricingPlanRouter = require('./plans/PricingPlanRouter');
 const AdminRouter = require('./Admin/AdminRouter');
@@ -27,7 +28,6 @@ const ProfileRouter = require ('./MyProfile/ProfileRouter')
 const ContactUsRouter =require('./ContactUs/ContactUsRouter');
 const TextRouter = require ('./TextEdider/TextRouter')
 const NotificationRouter = require('./Notification/NotificationRouter'); // Import Notification model
-
 
 
 const app = express();
@@ -82,6 +82,8 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Define routes
 app.use("/PPC", AddRouter);
+app.use("/PPC", AddRouters);
+
 app.use("/PPC", PricingPlanRouter);
 app.use("/PPC", AdminRouter);
 app.use("/PPC", OfficeRouter);
@@ -101,7 +103,6 @@ app.use('/PPC',ProfileRouter);
 app.use('/PPC',ContactUsRouter);
 app.use('/PPC', TextRouter)
 app.use('/PPC',NotificationRouter);
-
 
 
 // 404 Error Handling Middleware

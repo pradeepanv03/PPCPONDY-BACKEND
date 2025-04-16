@@ -72,3 +72,4 @@ const PricingPlanSchema = new mongoose.Schema({
 const PricingPlans = mongoose.model('PricingPlans', PricingPlanSchema);
 
 module.exports = PricingPlans;
+
