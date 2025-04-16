@@ -17,7 +17,6 @@ const normalizePhoneNumber = (number) => {
   
     return number; // fallback
   };
-  
   router.post('/need-help', async (req, res) => {
     const { phoneNumber, ppcId } = req.body;
   
@@ -669,78 +668,6 @@ router.get('/get-all-owners-and-buyers', async (req, res) => {
 
 
 
-router.post('/need-help', async (req, res) => {
-    const { phoneNumber, ppcId } = req.body;
-
-    try {
-        // Step 1: Check if the property exists
-        const property = await AddModel.findOne({ ppcId });
-
-        if (!property) {
-            return res.status(404).json({ message: 'Property not found' });
-        }
-
-        // Step 2: Check if help was already requested by this phone number
-        const isAlreadyInterested = property.helpRequests.some(
-            (request) => request.phoneNumber === phoneNumber
-        );
-
-        if (isAlreadyInterested) {
-            return res.status(400).json({
-                message: "You have already requested help for this property.",
-                status: "alreadySaved",
-                alreadySavedNumbers: property.helpRequests.map((request) => request.phoneNumber),
-            });
-        }
-
-        // Step 3: Add the new help request
-        const updatedProperty = await AddModel.findOneAndUpdate(
-            { ppcId },
-            { 
-                $push: { helpRequests: { phoneNumber } },
-                $set: { updatedAt: Date.now() }
-            },
-            { new: true }
-        );
-
-        // ✅ Step 4: Save a notification for the property owner
-        try {
-            const notification = await NotificationUser.create({
-                recipientPhoneNumber: updatedProperty.phoneNumber,  // Owner
-                senderPhoneNumber: phoneNumber,                     // Requesting user
-                ppcId,
-                message: `User ${phoneNumber} requested help for your property.`,
-                createdAt: new Date()
-            });
-        } catch (notifErr) {
-        }
-
-        // Step 5: Send response with updated property info
-        return res.status(200).json({
-            message: 'Your help request has been recorded!',
-            status: 'needHelp',
-            postedUserPhoneNumber: updatedProperty.phoneNumber,
-            ownerName: updatedProperty.ownerName,
-            propertyMode: updatedProperty.propertyMode,
-            propertyType: updatedProperty.propertyType,
-            price: updatedProperty.price,
-            area: updatedProperty.area,
-            city: updatedProperty.city,
-            createdAt: updatedProperty.createdAt,
-            updatedAt: updatedProperty.updatedAt,
-            views: updatedProperty.views,
-            status: updatedProperty.status,
-            photos: updatedProperty.photos || [],
-            helpRequestedUserPhoneNumbers: updatedProperty.helpRequests.map(req => req.phoneNumber)
-        });
-
-    } catch (error) {
-        return res.status(500).json({
-            message: 'Internal Server Error',
-            error: error.message
-        });
-    }
-});
 
 
 router.get('/get-help-as-buyer', async (req, res) => {
