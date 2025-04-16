@@ -18,7 +18,74 @@ const normalizePhoneNumber = (number) => {
     return number; // fallback
   };
   
-
+  router.post('/need-help', async (req, res) => {
+    const { phoneNumber, ppcId } = req.body;
+  
+    try {
+      const property = await AddModel.findOne({ ppcId });
+  
+      if (!property) {
+        return res.status(404).json({ message: 'Property not found' });
+      }
+  
+      const isAlreadyInterested = property.helpRequests?.some(
+        (request) => request.phoneNumber === phoneNumber
+      );
+  
+      if (isAlreadyInterested) {
+        return res.status(400).json({
+          message: "You have already requested help for this property.",
+          status: "alreadySaved",
+          alreadySavedNumbers: property.helpRequests.map((r) => r.phoneNumber),
+        });
+      }
+  
+      const updatedProperty = await AddModel.findOneAndUpdate(
+        { ppcId },
+        { 
+          $push: { helpRequests: { phoneNumber } },
+          $set: { updatedAt: Date.now() }
+        },
+        { new: true }
+      );
+  
+      try {
+        await NotificationUser.create({
+          recipientPhoneNumber: updatedProperty.phoneNumber,
+          senderPhoneNumber: phoneNumber,
+          ppcId,
+          message: `User ${phoneNumber} requested help for your property.`,
+          createdAt: new Date(),
+        });
+      } catch (notifErr) {
+        console.error("Notification error:", notifErr.message);
+      }
+  
+      return res.status(200).json({
+        message: 'Your help request has been recorded!',
+        status: 'needHelp',
+        postedUserPhoneNumber: updatedProperty.phoneNumber,
+        ownerName: updatedProperty.ownerName,
+        propertyMode: updatedProperty.propertyMode,
+        propertyType: updatedProperty.propertyType,
+        price: updatedProperty.price,
+        area: updatedProperty.area,
+        city: updatedProperty.city,
+        createdAt: updatedProperty.createdAt,
+        updatedAt: updatedProperty.updatedAt,
+        views: updatedProperty.views,
+        status: updatedProperty.status,
+        photos: updatedProperty.photos || [],
+        helpRequestedUserPhoneNumbers: updatedProperty.helpRequests.map(r => r.phoneNumber)
+      });
+  
+    } catch (error) {
+      return res.status(500).json({
+        message: 'Internal Server Error',
+        error: error.message
+      });
+    }
+  });
 router.post("/send-interests", async (req, res) => {
     const { phoneNumber, ppcId } = req.body;
 
