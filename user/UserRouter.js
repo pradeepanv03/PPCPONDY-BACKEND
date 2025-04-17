@@ -103,7 +103,6 @@ router.get('/user/login-mode-count', async (req, res) => {
       appLoginCount
     });
   } catch (error) {
-    console.error("Error fetching login mode counts:", error);
     return res.status(500).json({
       message: 'Server Error',
       error: error.message
