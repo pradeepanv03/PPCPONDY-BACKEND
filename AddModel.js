@@ -202,18 +202,57 @@ const AddSchema = new mongoose.Schema({
 
   ],
 
- 
-  helpRequests: [{ phoneNumber: { type: String },
-    requestedAt: { type: Date, default: Date.now },
-    date: { type: Date, default: Date.now },
-  }],
-
   soldOutReport: [{ phoneNumber: { type: String }, 
     date: { type: Date, default: Date.now },
    }],
 
    
+
+
+  helpRequests: [{
+    phoneNumber: { type: String },
+    selectHelpReason: {
+      type: String,
+      enum: [
+        'Help Me to Buy this Property',
+        'Book for Property Visit',
+        'Loan Help',
+        'Property Valuation',
+        'Document Verification',
+        'Property Surveying',
+        'EC',
+        'Patta Name Change',
+        'Registration Help',
+        'Others'
+      ],
+      required: true
+    },
+    comment: {
+      type: String,
+      trim: true
+    },
+    requestedAt: { type: Date, default: Date.now }
+  }],
+  
+  
   reportProperty: [{ phoneNumber: { type: String },
+    reason: {
+      type: String,
+      trim: true
+    },
+    // Enforce one of your preset reasons
+    selectReasons: {
+      type: String,
+      enum: [
+        'Already Sold',
+        'Wrong Information',
+        'Not Responding',
+        'Fraud',
+        'Duplicate Ads',
+        'Other'
+      ],
+      required: true
+    },
     date: { type: Date, default: Date.now },
    }],
 

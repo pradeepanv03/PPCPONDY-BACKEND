@@ -17,74 +17,8 @@ const normalizePhoneNumber = (number) => {
   
     return number; // fallback
   };
-  router.post('/need-help', async (req, res) => {
-    const { phoneNumber, ppcId } = req.body;
   
-    try {
-      const property = await AddModel.findOne({ ppcId });
-  
-      if (!property) {
-        return res.status(404).json({ message: 'Property not found' });
-      }
-  
-      const isAlreadyInterested = property.helpRequests?.some(
-        (request) => request.phoneNumber === phoneNumber
-      );
-  
-      if (isAlreadyInterested) {
-        return res.status(400).json({
-          message: "You have already requested help for this property.",
-          status: "alreadySaved",
-          alreadySavedNumbers: property.helpRequests.map((r) => r.phoneNumber),
-        });
-      }
-  
-      const updatedProperty = await AddModel.findOneAndUpdate(
-        { ppcId },
-        { 
-          $push: { helpRequests: { phoneNumber } },
-          $set: { updatedAt: Date.now() }
-        },
-        { new: true }
-      );
-  
-      try {
-        await NotificationUser.create({
-          recipientPhoneNumber: updatedProperty.phoneNumber,
-          senderPhoneNumber: phoneNumber,
-          ppcId,
-          message: `User ${phoneNumber} requested help for your property.`,
-          createdAt: new Date(),
-        });
-      } catch (notifErr) {
-        console.error("Notification error:", notifErr.message);
-      }
-  
-      return res.status(200).json({
-        message: 'Your help request has been recorded!',
-        status: 'needHelp',
-        postedUserPhoneNumber: updatedProperty.phoneNumber,
-        ownerName: updatedProperty.ownerName,
-        propertyMode: updatedProperty.propertyMode,
-        propertyType: updatedProperty.propertyType,
-        price: updatedProperty.price,
-        area: updatedProperty.area,
-        city: updatedProperty.city,
-        createdAt: updatedProperty.createdAt,
-        updatedAt: updatedProperty.updatedAt,
-        views: updatedProperty.views,
-        status: updatedProperty.status,
-        photos: updatedProperty.photos || [],
-        helpRequestedUserPhoneNumbers: updatedProperty.helpRequests.map(r => r.phoneNumber)
-      });
-  
-    } catch (error) {
-      return res.status(500).json({
-        message: 'Internal Server Error',
-        error: error.message
-      });
-    }
-  });
+
 router.post("/send-interests", async (req, res) => {
     const { phoneNumber, ppcId } = req.body;
 
@@ -667,8 +601,113 @@ router.get('/get-all-owners-and-buyers', async (req, res) => {
 });
 
 
+router.post('/need-help', async (req, res) => {
+  const { phoneNumber, ppcId, selectHelpReason, comment } = req.body;
 
+  // Enum check for help reasons
+  const allowedHelpReasons = [
+    'Help Me to Buy this Property',
+    'Book for Property Visit',
+    'Loan Help',
+    'Property Valuation',
+    'Document Verification',
+    'Property Surveying',
+    'EC',
+    'Patta Name Change',
+    'Registration Help',
+    'Others'
+  ];
 
+  if (!allowedHelpReasons.includes(selectHelpReason)) {
+    return res.status(400).json({
+      message: `Invalid help reason. Must be one of: ${allowedHelpReasons.join(', ')}.`
+    });
+  }
+
+  try {
+    const property = await AddModel.findOne({ ppcId });
+
+    if (!property) {
+      return res.status(404).json({ message: 'Property not found' });
+    }
+
+    const isAlreadyHelped = property.helpRequests?.some(
+      (req) => req.phoneNumber === phoneNumber && req.selectHelpReason === selectHelpReason
+    );
+
+    if (isAlreadyHelped) {
+      return res.status(400).json({
+        message: "You have already submitted this help request for this property.",
+        status: "alreadyRequested",
+        alreadyHelpedNumbers: property.helpRequests.map((r) => ({
+          phoneNumber: r.phoneNumber,
+          selectHelpReason: r.selectHelpReason
+        })),
+      });
+    }
+
+    const updatedProperty = await AddModel.findOneAndUpdate(
+      { ppcId },
+      {
+        $push: {
+          helpRequests: {
+            phoneNumber,
+            selectHelpReason,
+            comment,
+            requestedAt: new Date()
+          }
+        },
+        $set: { updatedAt: new Date() }
+      },
+      { new: true, runValidators: true }
+    );
+
+    try {
+      await NotificationUser.create({
+        recipientPhoneNumber: updatedProperty.phoneNumber,
+        senderPhoneNumber: phoneNumber,
+        ppcId,
+        message: `User ${phoneNumber} requested help: "${selectHelpReason}"`,
+        createdAt: new Date()
+      });
+    } catch (notifErr) {
+    }
+
+    return res.status(200).json({
+      message: 'Your help request has been recorded!',
+      status: 'needHelp',
+      postedUserPhoneNumber: updatedProperty.phoneNumber,
+      ownerName: updatedProperty.ownerName,
+      propertyMode: updatedProperty.propertyMode,
+      propertyType: updatedProperty.propertyType,
+      price: updatedProperty.price,
+      area: updatedProperty.area,
+      city: updatedProperty.city,
+      createdAt: updatedProperty.createdAt,
+      updatedAt: updatedProperty.updatedAt,
+      views: updatedProperty.views,
+      status: updatedProperty.status,
+      photos: updatedProperty.photos || [],
+      helpRequests: updatedProperty.helpRequests.map(r => ({
+        phoneNumber: r.phoneNumber,
+        selectHelpReason: r.selectHelpReason,
+        comment: r.comment,
+        requestedAt: r.requestedAt
+      }))
+    });
+
+  } catch (error) {
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({ message: error.message });
+    }
+    return res.status(500).json({
+      message: 'Internal Server Error',
+      error: error.message
+    });
+  }
+});
+
+  
 
 router.get('/get-help-as-buyer', async (req, res) => {
     try {
@@ -1278,78 +1317,111 @@ router.delete('/delete-contact/:ppcId', async (req, res) => {
 });
 
 
+// -----------------
+
+
+
+
+
+
+
+
+
 router.post('/report-property', async (req, res) => {
-    const { phoneNumber, ppcId, reportReason } = req.body;
-
-    try {
-        const property = await AddModel.findOne({ ppcId });
-
-        if (!property) {
-            return res.status(404).json({ message: 'Property not found' });
-        }
-
-        // Check if already reported
-        const isAlreadyReported = property.reportProperty.some(
-            (request) => request.phoneNumber === phoneNumber
-        );
-
-        if (isAlreadyReported) {
-            return res.status(400).json({
-                message: "You have already reported this property.",
-                status: "alreadyReported",
-                reportedNumbers: property.reportProperty.map(req => req.phoneNumber),
-            });
-        }
-
-        // Add new report entry
-        const updatedProperty = await AddModel.findOneAndUpdate(
-            { ppcId },
-            {
-                $push: { reportProperty: { phoneNumber, reportReason, createdAt: new Date() } },
-                $set: { updatedAt: new Date() }
-            },
-            { new: true }
-        );
-
-        // ✅ Send Notification to Property Owner
-        try {
-            const reportNotification = await NotificationUser.create({
-                recipientPhoneNumber: updatedProperty.phoneNumber, // Owner
-                senderPhoneNumber: phoneNumber,                   // Reporting user
-                ppcId,
-                message: `User ${phoneNumber} reported your property.`,
-                createdAt: new Date()
-            });
-        } catch (notifErr) {
-        }
-
-        return res.status(200).json({
-            message: 'Your report has been recorded!',
-            status: 'reportProperties',
-            postedUserPhoneNumber: updatedProperty.phoneNumber,
-            ownerName: updatedProperty.ownerName,
-            propertyMode: updatedProperty.propertyMode,
-            propertyType: updatedProperty.propertyType,
-            price: updatedProperty.price,
-            area: updatedProperty.area,
-            city: updatedProperty.city,
-            createdAt: updatedProperty.createdAt,
-            updatedAt: updatedProperty.updatedAt,
-            views: updatedProperty.views,
-            status: updatedProperty.status,
-            photos: updatedProperty.photos || [],
-            reportedNumbers: updatedProperty.reportProperty.map(req => ({
-                phoneNumber: req.phoneNumber,
-                reportReason: req.reportReason
-            }))
-        });
-
-    } catch (error) {
-        return res.status(500).json({ message: 'Internal Server Error', error: error.message });
+    const { phoneNumber, ppcId, reason, selectReasons } = req.body;
+  
+    // Quick pre‑check for the enum to return a friendlier error:
+    const allowed = [
+      'Already Sold',
+      'Wrong Information',
+      'Not Responding',
+      'Fraud',
+      'Duplicate Ads',
+      'Other'
+    ];
+    if (!allowed.includes(selectReasons)) {
+      return res.status(400).json({
+        message: `Invalid report reason. Must be one of: ${allowed.join(', ')}.`
+      });
     }
-});
-
-
+  
+    try {
+      const property = await AddModel.findOne({ ppcId });
+      if (!property) {
+        return res.status(404).json({ message: 'Property not found' });
+      }
+  
+      // Has this user already reported?
+      if (property.reportProperty.some(r => r.phoneNumber === phoneNumber)) {
+        return res.status(400).json({
+          message: "You have already reported this property.",
+          status: "alreadyReported",
+          reportedNumbers: property.reportProperty.map(r => r.phoneNumber)
+        });
+      }
+  
+      // Push the new report entry
+      const updatedProperty = await AddModel.findOneAndUpdate(
+        { ppcId },
+        {
+          $push: {
+            reportProperty: {
+              phoneNumber,
+              reason,           // free‑form text
+              selectReasons,    // one of your enums
+              date: new Date()  // or createdAt if you prefer
+            }
+          },
+          $set: { updatedAt: new Date() }
+        },
+        { new: true, runValidators: true }  // runValidators makes sure enum is checked
+      );
+  
+      // Send notification to the owner
+      try {
+        await NotificationUser.create({
+          recipientPhoneNumber: updatedProperty.phoneNumber,
+          senderPhoneNumber: phoneNumber,
+          ppcId,
+          message: `User ${phoneNumber} reported your property.`,
+          createdAt: new Date()
+        });
+      } catch (notifErr) {
+      }
+  
+      // Build response
+      return res.status(200).json({
+        message: 'Your report has been recorded!',
+        status: 'reportProperties',
+        postedUserPhoneNumber: updatedProperty.phoneNumber,
+        ownerName: updatedProperty.ownerName,
+        propertyMode: updatedProperty.propertyMode,
+        propertyType: updatedProperty.propertyType,
+        price: updatedProperty.price,
+        area: updatedProperty.area,
+        city: updatedProperty.city,
+        createdAt: updatedProperty.createdAt,
+        updatedAt: updatedProperty.updatedAt,
+        views: updatedProperty.views,
+        status: updatedProperty.status,
+        photos: updatedProperty.photos || [],
+        reportedNumbers: updatedProperty.reportProperty.map(r => ({
+          phoneNumber: r.phoneNumber,
+          reason: r.reason,
+          selectReasons: r.selectReasons,
+          date: r.date
+        }))
+      });
+  
+    } catch (error) {
+      // If the enum fails validation, Mongoose will throw a ValidationError
+      if (error.name === 'ValidationError') {
+        return res.status(400).json({ message: error.message });
+      }
+      return res.status(500).json({ message: 'Internal Server Error', error: error.message });
+    }
+  });
+  
 
 
 router.get('/get-reportproperty-buyer', async (req, res) => {
