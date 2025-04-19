@@ -110,77 +110,6 @@ router.post(
   );
   
 
-
-  const path = require('path');
-
-  
-// Upload API
-router.post(
-  '/upload-media-excel',
-  upload.fields([
-    { name: 'mediaFiles', maxCount: 1000 }, // images and videos
-    { name: 'excelFile', maxCount: 1 }
-  ]),
-  async (req, res) => {
-    try {
-      const mediaMap = {};
-
-      // Step 1: Map uploaded media file names to their paths
-      const uploadedMedia = req.files['mediaFiles'] || [];
-      uploadedMedia.forEach(file => {
-        const fileName = path.basename(file.originalname).toLowerCase();
-        mediaMap[fileName] = file.path;
-      });
-
-      // Step 2: Parse the uploaded Excel file
-      const excelPath = req.files['excelFile'][0].path;
-      const workbook = xlsx.readFile(excelPath);
-      const sheetName = workbook.SheetNames[0];
-      const rows = xlsx.utils.sheet_to_json(workbook.Sheets[sheetName]);
-
-      for (const row of rows) {
-        const ppcId = row.ppcId?.toString().trim();
-        const videoFileName = path.basename(row.video || '').toLowerCase();
-        const imageFileNames = row.images
-          ? row.images.split(',').map(name => path.basename(name.trim()).toLowerCase())
-          : [];
-
-        if (!ppcId) continue;
-
-        let user = await AddModel.findOne({ ppcId });
-        if (!user) {
-          user = new AddModel({ ppcId });
-        }
-
-        // Assign video if available
-        if (videoFileName && mediaMap[videoFileName]) {
-          user.video = mediaMap[videoFileName];
-        }
-
-        // Assign images if available
-        const matchedImages = imageFileNames
-          .map(name => mediaMap[name])
-          .filter(Boolean); // remove undefined
-
-        if (matchedImages.length > 0) {
-          user.photos = matchedImages;
-        }
-
-    
-
-        await user.save();
-      }
-
-      fs.unlinkSync(excelPath); // Cleanup uploaded Excel
-
-      return res.status(200).json({ message: 'Media assigned successfully to properties!' });
-    } catch (error) {
-      return res.status(500).json({ message: 'Upload failed.', error: error.message });
-    }
-  }
-);
-
-
 module.exports = router;
 
 
@@ -208,6 +137,85 @@ module.exports = router;
 
 
 
+// const express = require('express');
+// const multer = require('multer');
+// const xlsx = require('xlsx');
+// const fs = require('fs');
+// const AddModel = require('./AddModel'); // Replace with your actual AddModel file path
+// const router = express.Router();
+
+// // Multer storage configuration
+// const storage = multer.diskStorage({
+//   destination: (req, file, cb) => {
+//     cb(null, 'uploads/');  // Directory for storing the uploaded file
+//   },
+//   filename: (req, file, cb) => {
+//     cb(null, Date.now() + '-' + file.originalname);  // Unique file name with timestamp
+//   },
+// });
+
+// const upload = multer({ storage });  // Initialize multer with storage configuration
+
+// // Route for handling the file upload
+// router.post('/update-property-upload', upload.single('excelFile'), async (req, res) => {
+//   try {
+//     if (!req.file) {
+//       return res.status(400).json({ message: 'No file uploaded' });
+//     }
+
+//     // Read and parse the Excel file
+//     const excelPath = req.file.path;
+//     const workbook = xlsx.readFile(excelPath);
+//     const sheetName = workbook.SheetNames[0];
+//     const sheetData = xlsx.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1 });
+
+//     const headers = sheetData[0];
+//     const rows = sheetData.slice(1); // Skip header row
+
+//     for (const row of rows) {
+//       const fieldsToUpdate = {};
+
+//       headers.forEach((header, index) => {
+//         if (header && row[index] !== undefined) {
+//           const key = header.toString().trim();
+//           const value = row[index];
+//           fieldsToUpdate[key] = typeof value === 'number' ? value.toString() : String(value).trim();
+//         }
+//       });
+
+//       const { ppcId } = fieldsToUpdate;
+//       if (!ppcId) {
+//         continue;  // Skip if ppcId is not present in the row
+//       }
+
+//       let user = await AddModel.findOne({ ppcId });
+//       if (!user) {
+//         // Create new property if it doesn't exist
+//         user = new AddModel({ ppcId });
+//       }
+
+//       // Update fields
+//       Object.keys(fieldsToUpdate).forEach((key) => {
+//         if (key !== 'ppcId') {
+//           user[key] = fieldsToUpdate[key];
+//         }
+//       });
+
+//       // Save the updated property data
+//       await user.save();
+//     }
+
+//     // Delete the uploaded file after processing
+//     fs.unlinkSync(excelPath);
+
+//     res.status(200).json({ message: 'Properties updated successfully!' });
+//   } catch (error) {
+//     console.error('Error processing Excel file:', error);
+//     res.status(500).json({ message: 'Error updating properties.', error: error.message });
+//   }
+// });
+
+// module.exports = router;
 
 
 

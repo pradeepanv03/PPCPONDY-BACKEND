@@ -181,11 +181,11 @@ const AddSchema = new mongoose.Schema({
   status: {
     type: String,
     enum: ['incomplete','active','pending', 'complete','sendInterest', 'soldOut', 'reportProperties', 'needHelp', 'contact', 'favorite', 'alreadySaved', 'favoriteRemoved', 'delete','undo'],
-    default: 'incomplete',
+    default: 'pending',
   },
   
 
-  previousStatus: { type: String, enum: ['incomplete', 'complete','delete','active'] }, 
+  previousStatus: { type: String, enum: ['pending', 'complete','delete','active'] }, 
 
   featureStatus: {
     type: String,
@@ -208,6 +208,10 @@ const AddSchema = new mongoose.Schema({
 
    
 
+  // helpRequests: [{ phoneNumber: { type: String },
+  //   requestedAt: { type: Date, default: Date.now },
+  //   // date: { type: Date, default: Date.now },
+  // }],
 
   helpRequests: [{
     phoneNumber: { type: String },

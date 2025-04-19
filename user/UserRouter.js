@@ -3,6 +3,7 @@
 const express = require('express');
 const admin = require('firebase-admin');
 const UserLogin = require('./UserModel'); 
+const AddModel =require ('../AddModel')
 
 const router = express.Router();
 
@@ -21,6 +22,89 @@ const formatPhoneNumber = (phone, countryCode) => {
   if (phone.startsWith('+')) return phone; 
   return `${countryCode}${phone}`;
 };
+
+
+// // GET /user-lead-stats
+// router.get('/user-lead-stats', async (req, res) => {
+//   try {
+//     const users = await UserLogin.find();
+
+//     if (users.length === 0) {
+//       return res.status(404).json({ message: 'No users found' });
+//     }
+
+//     const stats = await Promise.all(
+//       users.map(async (user) => {
+//         const properties = await AddModel.find({ phoneNumber: user.phoneNumber });
+
+//         const interestCount = properties.reduce((acc, prop) => acc + (prop.interestRequests?.length || 0), 0);
+//         const contactCount = properties.reduce((acc, prop) => acc + (prop.contactRequests?.length || 0), 0);
+//         const favoriteCount = properties.reduce((acc, prop) => acc + (prop.favoriteRequests?.length || 0), 0);
+
+//         return {
+//           phoneNumber: user.phone,
+//           interestCount,
+//           contactCount,
+//           favoriteCount,
+//         };
+//       })
+//     );
+
+//     return res.status(200).json({ message: 'User stats fetched', data: stats });
+//   } catch (error) {
+//     return res.status(500).json({ message: 'Server Error', error: error.message });
+//   }
+// });
+
+
+// GET /user-lead-stats
+router.get('/user-lead-stats', async (req, res) => {
+  try {
+    const users = await UserLogin.find();
+
+    if (users.length === 0) {
+      return res.status(404).json({ message: 'No users found' });
+    }
+
+    const stats = await Promise.all(
+      users.map(async (user) => {
+        const properties = await AddModel.find({ phoneNumber: user.phone });
+
+        const totalInterestCount = properties.reduce((acc, prop) => acc + (prop.interestRequests?.length || 0), 0);
+        const totalContactCount = properties.reduce((acc, prop) => acc + (prop.contactRequests?.length || 0), 0);
+        const totalFavoriteCount = properties.reduce((acc, prop) => acc + (prop.favoriteRequests?.length || 0), 0);
+
+        const propertyDetails = properties.map((prop) => ({
+          ppcId: prop.ppcId,
+          propertyMode: prop.propertyMode,
+          propertyType: prop.propertyType,
+          city: prop.city,
+          area: prop.area,
+          createdAt:prop.createdAt,
+          updatedAt: prop.updatedAt,
+          interestCount: prop.interestRequests?.length || 0,
+          contactCount: prop.contactRequests?.length || 0,
+          favoriteCount: prop.favoriteRequests?.length || 0,
+        }));
+
+        return {
+          phoneNumber: user.phone,
+          totalInterestCount,
+          totalContactCount,
+          totalFavoriteCount,
+          properties: propertyDetails,
+        };
+      })
+    );
+
+    return res.status(200).json({ message: 'User stats fetched', data: stats });
+  } catch (error) {
+    return res.status(500).json({ message: 'Server Error', error: error.message });
+  }
+});
+
+
+
 
 
 router.post('/user/register', async (req, res) => {
@@ -103,6 +187,7 @@ router.get('/user/login-mode-count', async (req, res) => {
       appLoginCount
     });
   } catch (error) {
+    console.error("Error fetching login mode counts:", error);
     return res.status(500).json({
       message: 'Server Error',
       error: error.message

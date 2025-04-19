@@ -6,6 +6,8 @@ const UserViewsModel = require("./ViewsModel");
 const BuyerAssistance = require("./BuyerAssistance/BuyerAssistanceModel");
 const CallUserList = require('./CalledUserModel');
 const NotificationUser = require('./Notification/NotificationDetailModel');
+const DeletedAddModel = require ('./DeleteModel');
+const UserLogin = require('./user/UserModel'); 
 
 
 
@@ -46,6 +48,46 @@ const upload = multer({
       }
   },
 });
+
+
+// // Fixed version
+// router.get('/user-lead-stats', async (req, res) => {
+//   try {
+//     const users = await UserLogin.find();
+
+//     if (users.length === 0) {
+//       return res.status(404).json({ message: 'No users found' });
+//     }
+
+//     const stats = await Promise.all(
+//       users.map(async (user) => {
+//         const properties = await AddModel.find({ phoneNumber: user.phoneNumber });
+
+//         const propertyDetails = properties.map((prop) => ({
+//           ppcId: prop.ppcId,
+//           propertyMode: prop.propertyMode,
+//           propertyType: prop.propertyType,
+//           city: prop.city,
+//           area: prop.area,
+//           updatedAt: prop.updatedAt,
+//           interestCount: prop.interestRequests?.length || 0,
+//           contactCount: prop.contactRequests?.length || 0,
+//           favoriteCount: prop.favoriteRequests?.length || 0,
+//         }));
+
+//         return {
+//           phoneNumber: user.phone,
+//           properties: propertyDetails, // already includes all prop details
+//         };
+//       })
+//     );
+
+//     return res.status(200).json({ message: 'User stats fetched', data: stats });
+//   } catch (error) {
+//     return res.status(500).json({ message: 'Server Error', error: error.message });
+//   }
+// });
+
 
 
 router.put('/activate-all-properties', async (req, res) => {
@@ -771,7 +813,6 @@ router.get("/property-buyer-viewed", async (req, res) => {
 
 
 
-
 router.post(
   '/update-property',
   upload.fields([{ name: 'video', maxCount: 1 }, { name: 'photos', maxCount: 15 }]),
@@ -839,7 +880,7 @@ router.post(
         return res.status(404).json({ message: 'User not found.' });
       }
 
-      // Update user fields dynamically
+      // Update fields dynamically
       const fieldsToUpdate = {
         phoneNumber, price, rentalPropertyAddress, state, city, district, area, 
         streetName, doorNumber, nagar, ownerName, email, alternatePhone, countryCode, 
@@ -847,8 +888,7 @@ router.post(
         bedrooms, kitchen, kitchenType, balconies, floorNo, areaUnit, propertyApproved, 
         propertyAge, postedBy, facing, salesMode, salesType, furnished, lift, 
         attachedBathrooms, western, numberOfFloors, carParking, bestTimeToCall, totalArea,
-        length,
-        breadth,
+        length, breadth,
       };
 
       for (const key in fieldsToUpdate) {
@@ -867,43 +907,44 @@ router.post(
         }
       }
 
-      // Check if all required fields are filled
+      // Required fields to check for "complete" status
       const requiredFields = [
-        'phoneNumber', 'price', 'rentalPropertyAddress', 'state', 'city', 'district',
-        'area', 'streetName', 'doorNumber', 'nagar', 'ownerName', 'email', 'propertyMode',
-        'propertyType', 'ownership', 'bedrooms', 'kitchen', 'floorNo', 'areaUnit',
-        'propertyApproved', 'propertyAge', 'postedBy', 'facing', 'salesMode', 'salesType',
-        'furnished', 'carParking', 'totalArea',
-        'length',
-        'breadth',
+        'ppcId',
+        'phoneNumber',
+        'price',
+        'propertyMode',
+        'propertyType',
+        'areaUnit',
+        'salesType',
+        'totalArea',
+        'postedBy',
       ];
-
+      
 
       const isComplete = requiredFields.every((field) => user[field]);
-      user.status = isComplete ? "complete" : "incomplete"; 
-      
+      user.status = isComplete ? 'complete' : 'incomplete';
 
       await user.save();
 
-      // Save notification when property is updated
-try {
-  const notification = await NotificationUser.create({
-    recipientPhoneNumber: user.phoneNumber,
-    senderPhoneNumber: user.phoneNumber,
-    userPhoneNumber: user.phoneNumber,
-    ppcId: user.ppcId,
-    type: "property-Add",
-    message: `Your property (${user.ppcId}) has been Added successfully.`,
-    createdAt: new Date()
-  });
-
-} catch (notifErr) {
-}
+      // Save notification
+      try {
+        await NotificationUser.create({
+          recipientPhoneNumber: user.phoneNumber,
+          senderPhoneNumber: user.phoneNumber,
+          userPhoneNumber: user.phoneNumber,
+          ppcId: user.ppcId,
+          type: 'property-Add',
+          message: `Your property (${user.ppcId}) has been Added successfully.`,
+          createdAt: new Date(),
+        });
+      } catch (notifErr) {
+        console.error('Notification creation failed:', notifErr.message);
+      }
 
       res.status(200).json({
         message: 'Property details updated successfully!',
         ppcId: user.ppcId,
-        propertyStatus: user.propertyStatus,
+        propertyStatus: user.status,
         user,
       });
     } catch (error) {
@@ -912,24 +953,145 @@ try {
   }
 );
 
+// router.post(
+//   '/update-property',
+//   upload.fields([{ name: 'video', maxCount: 1 }, { name: 'photos', maxCount: 15 }]),
+//   async (req, res) => {
+//     if (req.fileValidationError) {
+//       return res.status(400).json({ message: req.fileValidationError });
+//     }
+//     if (req.files['video'] && req.files['video'][0].size > 50 * 1024 * 1024) {
+//       return res.status(400).json({ message: 'Video file size exceeds 50MB.' });
+//     }
 
-router.get('/fetch-property-dropdowns', async (req, res) => {
-  try {
-    const [propertyModes] = await Promise.all([
-      AddModel.distinct('propertyMode', { propertyMode: { $ne: null } }),
-    ]);
+//     const {
+//       ppcId,
+//       phoneNumber,
+//       price,
+//       rentalPropertyAddress,
+//       state,
+//       city,
+//       district,
+//       area,
+//       streetName,
+//       doorNumber,
+//       nagar,
+//       ownerName,
+//       email,
+//       alternatePhone,
+//       countryCode,
+//       alternateCountryCode,
+//       propertyMode,
+//       propertyType,
+//       bankLoan,
+//       negotiation,
+//       ownership,
+//       bedrooms,
+//       kitchen,
+//       kitchenType,
+//       balconies,
+//       floorNo,
+//       areaUnit,
+//       propertyApproved,
+//       propertyAge,
+//       postedBy,
+//       facing,
+//       salesMode,
+//       salesType,
+//       furnished,
+//       lift,
+//       attachedBathrooms,
+//       western,
+//       numberOfFloors,
+//       carParking,
+//       bestTimeToCall,
+//       totalArea,
+//       length,
+//       breadth,
+//     } = req.body;
 
-    res.status(200).json({
-      message: 'Property dropdown values fetched successfully',
-      propertyModes,
-    });
-  } catch (error) {
-    res.status(500).json({
-      message: 'Error fetching dropdown values',
-      error: error.message,
-    });
-  }
-});
+//     if (!ppcId) {
+//       return res.status(400).json({ message: 'PPC-ID is required.' });
+//     }
+
+//     try {
+//       const user = await AddModel.findOne({ ppcId });
+//       if (!user) {
+//         return res.status(404).json({ message: 'User not found.' });
+//       }
+
+//       // Update user fields dynamically
+//       const fieldsToUpdate = {
+//         phoneNumber, price, rentalPropertyAddress, state, city, district, area, 
+//         streetName, doorNumber, nagar, ownerName, email, alternatePhone, countryCode, 
+//         alternateCountryCode, propertyMode, propertyType, bankLoan, negotiation, ownership, 
+//         bedrooms, kitchen, kitchenType, balconies, floorNo, areaUnit, propertyApproved, 
+//         propertyAge, postedBy, facing, salesMode, salesType, furnished, lift, 
+//         attachedBathrooms, western, numberOfFloors, carParking, bestTimeToCall, totalArea,
+//         length,
+//         breadth,
+//       };
+
+//       for (const key in fieldsToUpdate) {
+//         if (fieldsToUpdate[key]) {
+//           user[key] = fieldsToUpdate[key];
+//         }
+//       }
+
+//       // Handle file uploads
+//       if (req.files) {
+//         if (req.files['video']) {
+//           user.video = req.files['video'][0].path;
+//         }
+//         if (req.files['photos']) {
+//           user.photos = req.files['photos'].map((file) => file.path);
+//         }
+//       }
+
+//       // Check if all required fields are filled
+//       const requiredFields = [
+//         'ppcId','phoneNumber', 'price',     'propertyMode',
+//         'propertyType',   'areaUnit',
+//          'salesMode', 'salesType',
+//          'totalArea',
+       
+//       ];
+
+
+//       const isComplete = requiredFields.every((field) => user[field]);
+//       user.status = isComplete ? "complete" : "incomplete"; 
+      
+
+//       await user.save();
+
+//       // Save notification when property is updated
+// try {
+//   const notification = await NotificationUser.create({
+//     recipientPhoneNumber: user.phoneNumber,
+//     senderPhoneNumber: user.phoneNumber,
+//     userPhoneNumber: user.phoneNumber,
+//     ppcId: user.ppcId,
+//     type: "property-Add",
+//     message: `Your property (${user.ppcId}) has been Added successfully.`,
+//     createdAt: new Date()
+//   });
+
+// } catch (notifErr) {
+// }
+
+//       res.status(200).json({
+//         message: 'Property details updated successfully!',
+//         ppcId: user.ppcId,
+//         propertyStatus: user.propertyStatus,
+//         user,
+//       });
+//     } catch (error) {
+//       res.status(500).json({ message: 'Error updating property details.', error });
+//     }
+//   }
+// );
+
+
 
 
 router.get('/fetch-property-dropdowns', async (req, res) => {
@@ -1040,19 +1202,33 @@ router.get('/deleted-properties-count', async (req, res) => {
   }
 });
 
-router.get('/pending-properties-count', async (req, res) => {
-  try {
-    // Count the documents with status "pending"
-    const count = await AddModel.countDocuments({ status: "pending" });
+// router.get('/pending-properties-count', async (req, res) => {
+//   try {
+//     // Count the documents with status "pending"
+//     const count = await AddModel.countDocuments({ status: "pending" });
 
-    // Send the count as response
-    res.json({ pendingProperties: count });
+//     // Send the count as response
+//     res.json({ pendingProperties: count });
+//   } catch (error) {
+//     res.status(500).json({ error: error.message });
+//   }
+// });
+
+
+// GET: Count of pending properties
+router.get("/pending-properties-count", async (req, res) => {
+  try {
+    // Count documents where status is 'pending' or 'incomplete'
+    const count = await AddModel.countDocuments({
+      status: { $in: ["pending","complete"] } // <-- Adjust this based on your business logic
+    });
+
+    res.status(200).json({ pendingProperties: count });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error("Error counting pending properties:", error);
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
-
-
 
 
 
@@ -2176,20 +2352,39 @@ router.get('/fetch-data', async (req, res) => {
 
 
 
+// router.get('/fetch-all-datas', async (req, res) => {
+//     try {
+
+//         // Fetch all users from the database
+//         const users = await AddModel.find({});
+
+//         // Return the fetched user data
+//         res.status(200).json({ message: 'All user data fetched successfully!', users });
+//     } catch (error) {
+//         res.status(500).json({ message: 'Error fetching all user details.', error });
+//     }
+// });
+
+
 router.get('/fetch-all-datas', async (req, res) => {
-    try {
+  try {
+    // Delete all "incomplete" entries from DB
+    await AddModel.deleteMany({ status: 'incomplete' });
 
-        // Fetch all users from the database
-        const users = await AddModel.find({});
+    // Fetch only "complete" entries
+    const users = await AddModel.find({ status: 'complete' });
 
-        // Return the fetched user data
-        res.status(200).json({ message: 'All user data fetched successfully!', users });
-    } catch (error) {
-        res.status(500).json({ message: 'Error fetching all user details.', error });
-    }
+    res.status(200).json({
+      message: 'Only complete user data fetched successfully!',
+      users
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: 'Error fetching user data.',
+      error
+    });
+  }
 });
-
-
 
 
 // API to fetch distinct states from AddModel
@@ -2219,11 +2414,31 @@ router.get("/fetch-all-properties", async (req, res) => {
   }
 });
 
-// Fetch properties from Puducherry (Case-Insensitive)
+// // Fetch properties from Puducherry (Case-Insensitive)
+// router.get("/fetch-Pudhucherry-properties", async (req, res) => {
+//   try {
+//     const pondicherryData = await AddModel.find({ 
+//       state: { $regex: /^puducherry$/i }  // Case-insensitive match
+//     });
+
+//     if (pondicherryData.length === 0) {
+//       return res.status(404).json({ success: false, message: "No data found for Puducherry" });
+//     }
+
+//     res.json({ success: true, data: pondicherryData });
+//   } catch (error) {
+//     res.status(500).json({ success: false, message: "Server error", error });
+//   }
+// });
+
+
+// Fetch properties from all Puducherry variants (case-insensitive)
 router.get("/fetch-Pudhucherry-properties", async (req, res) => {
   try {
-    const pondicherryData = await AddModel.find({ 
-      state: { $regex: /^puducherry$/i }  // Case-insensitive match
+    const pondicherryData = await AddModel.find({
+      state: {
+        $regex: /^(puducherry|pudhucherry|pondicherry|pondicherry town|pudhucherry town|pondi)$/i
+      }
     });
 
     if (pondicherryData.length === 0) {
@@ -2237,14 +2452,12 @@ router.get("/fetch-Pudhucherry-properties", async (req, res) => {
 });
 
 
-
-
 // Route: GET /fetch-active-users
 router.get('/fetch-active-users', async (req, res) => {
   try {
     // Fetch users with specific statuses
     const users = await AddModel.find({
-      status: { $in: ['active', 'delete', 'contact'] }
+      status: { $in: ['active'] }
     });
 
     // Respond with the fetched users
@@ -2275,6 +2488,70 @@ router.get('/fetch-all-complete-data', async (req, res) => {
 });
 
 
+
+
+// Route: /get-deleted-properties
+router.get('/get-deleted-properties-datas', async (req, res) => {
+  try {
+    const deletedData = await DeletedAddModel.find(); // or AddModel.find({ isDeleted: true })
+    res.status(200).json({ deleted: deletedData });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to fetch deleted properties.', error });
+  }
+});
+
+
+router.delete('/delete-permenent-data', async (req, res) => {
+  const { ppcId } = req.query;
+
+  if (!ppcId) {
+      return res.status(400).json({ message: 'PPC-ID is required.' });
+  }
+
+  try {
+      // Delete user based on ppcId only
+      const deletedUser = await DeletedAddModel.findOneAndDelete({ ppcId });
+
+      if (!deletedUser) {
+          return res.status(404).json({ message: 'User not found.' });
+      }
+
+      res.status(200).json({ message: 'User Permenent deleted successfully!', deletedUser });
+  } catch (error) {
+      res.status(500).json({ message: 'Error deleting user.', error });
+  }
+});
+
+
+router.delete('/delete-ppcId-data', async (req, res) => {
+  const { ppcId } = req.query;
+
+  if (!ppcId) {
+    return res.status(400).json({ message: 'PPC-ID is required.' });
+  }
+
+  try {
+    // Find user first
+    const userToDelete = await AddModel.findOne({ ppcId });
+    if (!userToDelete) {
+      return res.status(404).json({ message: 'User not found.' });
+    }
+
+    // Save the deleted data to DeletedAddModel
+    await DeletedAddModel.create({
+      ...userToDelete.toObject(),
+      deletedAt: new Date(),
+    });
+
+    // Then delete from the original collection
+    await AddModel.deleteOne({ ppcId });
+
+    res.status(200).json({ message: 'User Permenent deleted successfully!', deletedUser: userToDelete });
+  } catch (error) {
+    console.error("Delete error:", error);
+    res.status(500).json({ message: 'Error deleting user.', error });
+  }
+});
 
 
 router.delete('/delete-data', async (req, res) => {
@@ -2487,6 +2764,18 @@ router.post('/delete-property', async (req, res) => {
   });
   
 
+  // Delete all properties endpoint
+router.delete('/delete-all-properties', async (req, res) => {
+  try {
+    const result = await AddModel.deleteMany({}); // Deletes all documents in the collection
+    res.status(200).json({ message: 'All properties deleted successfully.', deletedCount: result.deletedCount });
+  } catch (error) {
+    console.error('Error deleting all properties:', error);
+    res.status(500).json({ message: 'Error deleting all properties.' });
+  }
+});
+
+
 router.get('/fetch-status', async (req, res) => {
     const { phoneNumber } = req.query;
   
@@ -2501,7 +2790,7 @@ router.get('/fetch-status', async (req, res) => {
   
       const query = {
         phoneNumber: new RegExp(normalizedPhoneNumber + '$'),
-        status: { $in: ['incomplete', 'complete','pending','active'] },
+        status: { $in: ['incomplete', 'complete','pending','active','sendInterest', 'soldOut', 'reportProperties', 'needHelp', 'contact', 'favorite'] },
       };
   
       const users = await AddModel.find(query);
@@ -2787,6 +3076,20 @@ router.get('/properties/pending', async (req, res) => {
       message: 'Error fetching pending properties.',
       error: error.message,
     });
+  }
+});
+
+
+// Assuming AddModel is already imported
+router.get('/approved-properties-count', async (req, res) => {
+  try {
+    // Count documents where propertyApproved is 'yes'
+    const count = await AddModel.countDocuments({ propertyApproved: "yes" });
+
+    res.status(200).json({ approvedProperties: count });
+  } catch (error) {
+    console.error("Error fetching approved properties count:", error);
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
 

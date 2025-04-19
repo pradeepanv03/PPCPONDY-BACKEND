@@ -3,8 +3,6 @@ const router = express.Router();
 const AdminLogin = require('../Admin/AdminModel')
 const ProfileData = require("../MyProfile/ProfileModel");
 
-
-
 // Admin login route (POST /login)
 router.post('/adminlogin', async (req, res) => {
     const { name, password } = req.body;
@@ -26,6 +24,32 @@ router.post('/adminlogin', async (req, res) => {
 
     } catch (error) {
         return res.status(500).json({ message: 'Something went wrong', error: error.message });
+    }
+});
+
+router.get('/get-admin-logs', async (req, res) => {
+    const { page = 1, limit = 10 } = req.query; // Set default page and limit
+
+    try {
+        const logs = await AdminLogin.find()
+            .skip((page - 1) * limit)  // Skip the appropriate number of records based on the page
+            .limit(Number(limit))  // Limit the number of records returned
+            .sort({ date: -1 }); // Sort logs by date in descending order (latest first)
+
+        const totalLogs = await AdminLogin.countDocuments(); // Get the total number of logs
+
+        return res.status(200).json({
+            logs,
+            totalLogs,
+            totalPages: Math.ceil(totalLogs / limit),  // Calculate total pages
+            currentPage: page
+        });
+    } catch (error) {
+        console.error("Error fetching admin logs:", error);
+        return res.status(500).json({
+            message: 'Server Error',
+            error: error.message
+        });
     }
 });
 

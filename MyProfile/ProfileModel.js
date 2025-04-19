@@ -8,7 +8,9 @@ const ProfileSchema = new mongoose.Schema(
     address: { type: String },
     profileImage: { type: String }, // Store image URL or file path
     password: { type: String },
-
+    pucNumber:
+    { type: String },
+    createdBy: { type: String }, // 👈 Store admin name or ID
 
 
   },

@@ -201,8 +201,41 @@ router.get("/get-user-notifications", async (req, res) => {
       return res.status(500).json({ message: "Internal Server Error", error: error.message });
     }
   });
+
+  
+  router.get("/get-all-notifications", async (req, res) => {
+    try {
+      const notifications = await NotificationUser.find({}).sort({ createdAt: -1 });
+  
+      return res.status(200).json({
+        message: "All notifications fetched successfully",
+        notifications
+      });
+    } catch (error) {
+      return res.status(500).json({ message: "Internal Server Error", error: error.message });
+    }
+  });
+
+  router.get("/get-all-notifications-read", async (req, res) => {
+    const { isRead } = req.query;  // Optional query parameter to filter by read/unread
+    
+    const query = isRead !== undefined ? { isRead: isRead === 'true' } : {};
+  
+    try {
+      const notifications = await NotificationUser.find(query).sort({ createdAt: -1 });
+  
+      return res.status(200).json({
+        message: "Notifications fetched successfully",
+        notifications
+      });
+    } catch (error) {
+      return res.status(500).json({ message: "Internal Server Error", error: error.message });
+    }
+  });
+  
   
 
+  
   router.put("/mark-notifications-read", async (req, res) => {
     let { phoneNumber } = req.body;
   
@@ -601,6 +634,109 @@ router.get('/get-all-owners-and-buyers', async (req, res) => {
 });
 
 
+
+
+// ------------------
+
+// router.post('/need-help', async (req, res) => {
+//     const { phoneNumber, ppcId } = req.body;
+  
+//     try {
+//       const property = await AddModel.findOne({ ppcId });
+  
+//       if (!property) {
+//         return res.status(404).json({ message: 'Property not found' });
+//       }
+  
+//       const isAlreadyInterested = property.helpRequests?.some(
+//         (request) => request.phoneNumber === phoneNumber
+//       );
+  
+//       if (isAlreadyInterested) {
+//         return res.status(400).json({
+//           message: "You have already requested help for this property.",
+//           status: "alreadySaved",
+//           alreadySavedNumbers: property.helpRequests.map((r) => r.phoneNumber),
+//         });
+//       }
+  
+//       const updatedProperty = await AddModel.findOneAndUpdate(
+//         { ppcId },
+//         { 
+//           $push: { helpRequests: { phoneNumber } },
+//           $set: { updatedAt: Date.now() }
+//         },
+//         { new: true }
+//       );
+  
+//       try {
+//         await NotificationUser.create({
+//           recipientPhoneNumber: updatedProperty.phoneNumber,
+//           senderPhoneNumber: phoneNumber,
+//           ppcId,
+//           message: `User ${phoneNumber} requested help for your property.`,
+//           createdAt: new Date(),
+//         });
+//       } catch (notifErr) {
+//         console.error("Notification error:", notifErr.message);
+//       }
+  
+//       return res.status(200).json({
+//         message: 'Your help request has been recorded!',
+//         status: 'needHelp',
+//         postedUserPhoneNumber: updatedProperty.phoneNumber,
+//         ownerName: updatedProperty.ownerName,
+//         propertyMode: updatedProperty.propertyMode,
+//         propertyType: updatedProperty.propertyType,
+//         price: updatedProperty.price,
+//         area: updatedProperty.area,
+//         city: updatedProperty.city,
+//         createdAt: updatedProperty.createdAt,
+//         updatedAt: updatedProperty.updatedAt,
+//         views: updatedProperty.views,
+//         status: updatedProperty.status,
+//         photos: updatedProperty.photos || [],
+//         helpRequestedUserPhoneNumbers: updatedProperty.helpRequests.map(r => r.phoneNumber)
+//       });
+  
+//     } catch (error) {
+//       return res.status(500).json({
+//         message: 'Internal Server Error',
+//         error: error.message
+//       });
+//     }
+//   });
+
+
+  router.get('/total-help-request-count', async (req, res) => {
+    try {
+      const result = await AddModel.aggregate([
+        {
+          $project: {
+            helpRequestCount: { $size: { $ifNull: ["$helpRequests", []] } }
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            totalHelpRequests: { $sum: "$helpRequestCount" }
+          }
+        }
+      ]);
+  
+      const totalHelpRequests = result[0]?.totalHelpRequests || 0;
+  
+      res.status(200).json({ totalHelpRequests });
+    } catch (error) {
+      res.status(500).json({
+        message: 'Failed to get total help request count',
+        error: error.message
+      });
+    }
+  });
+  
+
+
 router.post('/need-help', async (req, res) => {
   const { phoneNumber, ppcId, selectHelpReason, comment } = req.body;
 
@@ -671,6 +807,7 @@ router.post('/need-help', async (req, res) => {
         createdAt: new Date()
       });
     } catch (notifErr) {
+      console.error("Notification error:", notifErr.message);
     }
 
     return res.status(200).json({
@@ -700,6 +837,49 @@ router.post('/need-help', async (req, res) => {
     if (error.name === 'ValidationError') {
       return res.status(400).json({ message: error.message });
     }
+    console.error(error);
+    return res.status(500).json({
+      message: 'Internal Server Error',
+      error: error.message
+    });
+  }
+});
+
+router.get('/get-help-requests', async (req, res) => {
+  try {
+    const properties = await AddModel.find({ "helpRequests.0": { $exists: true } }); // Only fetch properties with helpRequests
+
+    const helpRequests = [];
+
+    properties.forEach(property => {
+      property.helpRequests.forEach(request => {
+        helpRequests.push({
+          ppcId: property.ppcId,
+          ownerName: property.ownerName,
+          ownerPhoneNumber: property.phoneNumber,
+          propertyMode: property.propertyMode,
+          propertyType: property.propertyType,
+          price: property.price,
+          area: property.area,
+          city: property.city,
+          state: property.state,
+          createdAt: property.createdAt,
+          updatedAt: property.updatedAt,
+          phoneNumber: request.phoneNumber,
+          selectHelpReason: request.selectHelpReason,
+          comment: request.comment,
+          requestedAt: request.requestedAt
+        });
+      });
+    });
+
+    return res.status(200).json({
+      message: 'Help request data fetched successfully',
+      data: helpRequests
+    });
+
+  } catch (error) {
+    console.error("Error fetching help requests:", error.message);
     return res.status(500).json({
       message: 'Internal Server Error',
       error: error.message
@@ -977,6 +1157,29 @@ router.post('/contact', async (req, res) => {
       return res.status(500).json({ success: false, message: 'Server Error', error: error.message });
     }
   });
+
+
+  router.get('/owners-contact-count/:phoneNumber', async (req, res) => {
+    const { phoneNumber } = req.params;
+  
+    try {
+      const properties = await AddModel.find({ phoneNumber });
+  
+      const totalContactCount = properties.reduce((acc, prop) => {
+        return acc + (prop.contactRequests?.length || 0);
+      }, 0);
+  
+      return res.status(200).json({
+        success: true,
+        phoneNumber,
+        totalContactCount,
+      });
+  
+    } catch (error) {
+      return res.status(500).json({ success: false, message: 'Server error', error: error.message });
+    }
+  });
+  
 
 
   router.post('/contact-send', async (req, res) => {
@@ -1387,6 +1590,7 @@ router.post('/report-property', async (req, res) => {
           createdAt: new Date()
         });
       } catch (notifErr) {
+        console.error('Notif error:', notifErr);
       }
   
       // Build response
@@ -1418,11 +1622,174 @@ router.post('/report-property', async (req, res) => {
       if (error.name === 'ValidationError') {
         return res.status(400).json({ message: error.message });
       }
+      console.error(error);
       return res.status(500).json({ message: 'Internal Server Error', error: error.message });
     }
   });
+
+
+  router.get('/get-reported-properties', async (req, res) => {
+    try {
+      // Find properties where at least one report exists
+      const reportedProperties = await AddModel.find({
+        reportProperty: { $exists: true, $ne: [] }
+      });
+  
+      if (reportedProperties.length === 0) {
+        return res.status(404).json({ message: 'No reported properties found', success: false });
+      }
+  
+      // Return only necessary fields (customize as needed)
+      const formattedData = reportedProperties.map(property => ({
+        ppcId: property.ppcId,
+        ownerPhoneNumber: property.phoneNumber,
+        ownerName: property.ownerName,
+        propertyMode: property.propertyMode,
+        propertyType: property.propertyType,
+        price: property.price,
+        area: property.area,
+        city: property.city,
+        state: property.state,
+        photos: property.photos || [],
+        createdAt: property.createdAt,
+        updatedAt: property.updatedAt,
+        totalReports: property.reportProperty.length,
+        reportDetails: property.reportProperty.map(r => ({
+          phoneNumber: r.phoneNumber,
+          reason: r.reason,
+          selectReasons: r.selectReasons,
+          date: r.date
+        }))
+      }));
+  
+      res.status(200).json({ success: true, data: formattedData });
+  
+    } catch (error) {
+      console.error('Error fetching reported properties:', error);
+      res.status(500).json({ success: false, message: 'Internal Server Error', error: error.message });
+    }
+  });
+  
   
 
+// router.post('/report-property', async (req, res) => {
+//     const { phoneNumber, ppcId, reportReason } = req.body;
+
+//     try {
+//         const property = await AddModel.findOne({ ppcId });
+
+//         if (!property) {
+//             return res.status(404).json({ message: 'Property not found' });
+//         }
+
+//         // Check if already reported
+//         const isAlreadyReported = property.reportProperty.some(
+//             (request) => request.phoneNumber === phoneNumber
+//         );
+
+//         if (isAlreadyReported) {
+//             return res.status(400).json({
+//                 message: "You have already reported this property.",
+//                 status: "alreadyReported",
+//                 reportedNumbers: property.reportProperty.map(req => req.phoneNumber),
+//             });
+//         }
+
+//         // Add new report entry
+//         const updatedProperty = await AddModel.findOneAndUpdate(
+//             { ppcId },
+//             {
+//                 $push: { reportProperty: { phoneNumber, reportReason, createdAt: new Date() } },
+//                 $set: { updatedAt: new Date() }
+//             },
+//             { new: true }
+//         );
+
+//         // ✅ Send Notification to Property Owner
+//         try {
+//             const reportNotification = await NotificationUser.create({
+//                 recipientPhoneNumber: updatedProperty.phoneNumber, // Owner
+//                 senderPhoneNumber: phoneNumber,                   // Reporting user
+//                 ppcId,
+//                 message: `User ${phoneNumber} reported your property.`,
+//                 createdAt: new Date()
+//             });
+//         } catch (notifErr) {
+//         }
+
+//         return res.status(200).json({
+//             message: 'Your report has been recorded!',
+//             status: 'reportProperties',
+//             postedUserPhoneNumber: updatedProperty.phoneNumber,
+//             ownerName: updatedProperty.ownerName,
+//             propertyMode: updatedProperty.propertyMode,
+//             propertyType: updatedProperty.propertyType,
+//             price: updatedProperty.price,
+//             area: updatedProperty.area,
+//             city: updatedProperty.city,
+//             createdAt: updatedProperty.createdAt,
+//             updatedAt: updatedProperty.updatedAt,
+//             views: updatedProperty.views,
+//             status: updatedProperty.status,
+//             photos: updatedProperty.photos || [],
+//             reportedNumbers: updatedProperty.reportProperty.map(req => ({
+//                 phoneNumber: req.phoneNumber,
+//                 reportReason: req.reportReason
+//             }))
+//         });
+
+//     } catch (error) {
+//         return res.status(500).json({ message: 'Internal Server Error', error: error.message });
+//     }
+// });
+
+
+router.get('/property-reports-count', async (req, res) => {
+    try {
+      // Get login mode filter from query params (default to 'web' if not provided)
+      const { loginMode = 'web' } = req.query;
+  
+      // Count the total number of properties that have at least one report and filter by loginMode
+      const reportCount = await AddModel.aggregate([
+        {
+          $match: { 'reportProperty.0': { $exists: true } }  // Match properties with at least one report
+        },
+        {
+          $lookup: {
+            from: 'userlogins',  // Assuming your collection for user login info is named 'userlogins'
+            localField: 'reportProperty.phoneNumber',  // Field from 'AddModel' that refers to the phone number of the reporter
+            foreignField: 'phone',  // Field from 'UserLogin' that refers to the phone number
+            as: 'reporterDetails'  // Alias for the result of the join
+          }
+        },
+        {
+          $unwind: '$reporterDetails'  // Unwind the result to join the documents
+        },
+        {
+          $match: {
+            'reporterDetails.loginMode': { $regex: new RegExp(`^${loginMode}$`, 'i') }  // Match by loginMode (either 'web' or 'app')
+          }
+        },
+        {
+          $count: 'totalReportedProperties'  // Count the total number of reported properties
+        }
+      ]);
+  
+      const totalReportedProperties = reportCount.length > 0 ? reportCount[0].totalReportedProperties : 0;
+  
+      return res.status(200).json({
+        message: 'Total report counts fetched successfully',
+        totalReportedProperties
+      });
+    } catch (error) {
+      console.error("Error fetching report counts:", error);
+      return res.status(500).json({
+        message: 'Server Error',
+        error: error.message
+      });
+    }
+  });
+  
 
 router.get('/get-reportproperty-buyer', async (req, res) => {
     try {
@@ -2006,59 +2373,143 @@ router.delete('/delete-soldout/:ppcId', async (req, res) => {
 });
 
 
+// ---------------------------
+
+
+// router.post("/add-favorite", async (req, res) => {
+//     const { phoneNumber, ppcId } = req.body;
+
+//     if (!phoneNumber || !ppcId) {
+//         return res.status(400).json({ message: "Phone number and Property ID are required" });
+//     }
+
+//     try {
+//         const property = await AddModel.findOne({ ppcId });
+
+//         if (!property) {
+//             return res.status(404).json({ message: "Property not found" });
+//         }
+
+//         await property.favoriteRequests(phoneNumber);
+
+//         // ✅ Notification to owner
+//         try {
+//             await NotificationUser.create({
+//                 recipientPhoneNumber: property.phoneNumber,
+//                 senderPhoneNumber: phoneNumber,
+//                 ppcId,
+//                 message: `User ${phoneNumber} added your property to favorites.`,
+//                 createdAt: new Date()
+//             });
+//         } catch (notifErr) {
+//         }
+
+//         return res.status(200).json({
+//             message: "Property added to your favorites!",
+//             status: "favorite",
+//             postedUserPhoneNumber: property.phoneNumber,
+//             ownerName: property.ownerName,
+//             propertyMode: property.propertyMode,
+//             propertyType: property.propertyType,
+//             price: property.price,
+//             area: property.area,
+//             city: property.city,
+//             createdAt: property.createdAt,
+//             updatedAt: new Date(),
+//             photos: property.photos || [],
+//             views: property.views,
+//             favoriteRequests: property.favoriteRequests.map(fav => ({
+//                 phoneNumber: fav.phoneNumber,
+//                 favoritedAt: fav.date
+//             })),
+//             readStatus: "Unread"
+//         });
+//     } catch (error) {
+//         return res.status(500).json({ message: "Internal Server Error", error: error.message });
+//     }
+// });
+
 
 router.post("/add-favorite", async (req, res) => {
-    const { phoneNumber, ppcId } = req.body;
+  const { phoneNumber, ppcId } = req.body;
 
-    if (!phoneNumber || !ppcId) {
-        return res.status(400).json({ message: "Phone number and Property ID are required" });
-    }
+  if (!phoneNumber || !ppcId) {
+      return res.status(400).json({ message: "Phone number and Property ID are required" });
+  }
 
-    try {
-        const property = await AddModel.findOne({ ppcId });
+  try {
+      const property = await AddModel.findOne({ ppcId });
 
-        if (!property) {
-            return res.status(404).json({ message: "Property not found" });
-        }
+      if (!property) {
+          return res.status(404).json({ message: "Property not found" });
+      }
 
-        await property.favoriteRequests(phoneNumber);
+      // ✅ Add to favorites
+      property.favoriteRequests.push({ phoneNumber });
+      await property.save();
 
-        // ✅ Notification to owner
-        try {
-            await NotificationUser.create({
-                recipientPhoneNumber: property.phoneNumber,
-                senderPhoneNumber: phoneNumber,
-                ppcId,
-                message: `User ${phoneNumber} added your property to favorites.`,
-                createdAt: new Date()
-            });
-        } catch (notifErr) {
-        }
+      // ✅ Create notification for the property owner
+      try {
+          await NotificationUser.create({
+              recipientPhoneNumber: property.phoneNumber,
+              senderPhoneNumber: phoneNumber,
+              ppcId,
+              message: `User ${phoneNumber} added your property to favorites.`,
+              createdAt: new Date()
+          });
+      } catch (notifErr) {
+          console.error("Notification error:", notifErr.message);
+      }
 
-        return res.status(200).json({
-            message: "Property added to your favorites!",
-            status: "favorite",
-            postedUserPhoneNumber: property.phoneNumber,
-            ownerName: property.ownerName,
-            propertyMode: property.propertyMode,
-            propertyType: property.propertyType,
-            price: property.price,
-            area: property.area,
-            city: property.city,
-            createdAt: property.createdAt,
-            updatedAt: new Date(),
-            photos: property.photos || [],
-            views: property.views,
-            favoriteRequests: property.favoriteRequests.map(fav => ({
-                phoneNumber: fav.phoneNumber,
-                favoritedAt: fav.date
-            })),
-            readStatus: "Unread"
-        });
-    } catch (error) {
-        return res.status(500).json({ message: "Internal Server Error", error: error.message });
-    }
+      return res.status(200).json({
+          message: "Property added to your favorites!",
+          status: "favorite",
+          postedUserPhoneNumber: property.phoneNumber,
+          ownerName: property.ownerName,
+          propertyMode: property.propertyMode,
+          propertyType: property.propertyType,
+          price: property.price,
+          area: property.area,
+          city: property.city,
+          createdAt: property.createdAt,
+          updatedAt: new Date(),
+          photos: property.photos || [],
+          views: property.views,
+          favoriteRequests: property.favoriteRequests.map(fav => ({
+              phoneNumber: fav.phoneNumber,
+              favoritedAt: fav.date
+          })),
+          readStatus: "Unread"
+      });
+
+  } catch (error) {
+      return res.status(500).json({ message: "Internal Server Error", error: error.message });
+  }
 });
+
+
+router.get('/favorite-counts/:phoneNumber', async (req, res) => {
+    const { phoneNumber } = req.params;
+  
+    try {
+      const properties = await AddModel.find({ phoneNumber });
+  
+      const totalFavoriteCount = properties.reduce((acc, property) => {
+        return acc + (property.favoriteRequests?.length || 0);
+      }, 0);
+  
+      return res.status(200).json({
+        success: true,
+        phoneNumber,
+        totalFavoriteCount,
+      });
+  
+    } catch (error) {
+      return res.status(500).json({ success: false, message: 'Server Error', error: error.message });
+    }
+  });
+  
+
 
 
 router.post("/remove-favorite", async (req, res) => {

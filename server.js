@@ -28,7 +28,7 @@ const ProfileRouter = require ('./MyProfile/ProfileRouter')
 const ContactUsRouter =require('./ContactUs/ContactUsRouter');
 const TextRouter = require ('./TextEdider/TextRouter')
 const NotificationRouter = require('./Notification/NotificationRouter'); // Import Notification model
-
+const VisitAdminRouter = require ('./visit/VisitAdminRouter')
 
 const app = express();
 const port = process.env.PORT || 5006;
@@ -36,9 +36,14 @@ const mongoURI = process.env.MONGO_URI;
 const secretKey = process.env.SECRET_KEY;
 
 // Connect to MongoDB
-mongoose.connect(mongoURI, { useNewUrlParser: true, useUnifiedTopology: true })
+// mongoose.connect(mongoURI, { useNewUrlParser: true, useUnifiedTopology: true })
+//   .then(() => console.log("Database connected successfully"))
+//   .catch((err) => console.error("Database connection failed:", err));
+
+mongoose.connect(mongoURI)
   .then(() => console.log("Database connected successfully"))
   .catch((err) => console.error("Database connection failed:", err));
+
 
 app.use(cors());
 app.use(express.json());
@@ -103,6 +108,7 @@ app.use('/PPC',ProfileRouter);
 app.use('/PPC',ContactUsRouter);
 app.use('/PPC', TextRouter)
 app.use('/PPC',NotificationRouter);
+app.use('/PPC',VisitAdminRouter);
 
 
 // 404 Error Handling Middleware

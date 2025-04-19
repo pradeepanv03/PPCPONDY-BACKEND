@@ -1,5 +1,7 @@
 const express = require("express");
 const ProfileData = require("../MyProfile/ProfileModel");
+const AdminLogin = require('../Admin/AdminModel')
+
 
 const router = express.Router();
 
@@ -18,13 +20,38 @@ const upload = multer({ storage });
 
 
 
-// Add New Profile
+// // Add New Profile
+// router.post("/profile", upload.single("profileImage"), async (req, res) => {
+//   try {
+//     const { pucNumber, name, password, email } = req.body;
+//     const profileImage = req.file ? req.file.path : "";
+
+//     const newProfile = new ProfileData({ pucNumber, profileImage, name, password, email });
+//     await newProfile.save();
+
+//     res.status(201).json({ message: "Profile created successfully", data: newProfile });
+//   } catch (error) {
+//     res.status(500).json({ message: "Error creating profile", error });
+//   }
+// });
+
 router.post("/profile", upload.single("profileImage"), async (req, res) => {
   try {
-    const { pucNumber, name, password, email } = req.body;
+    const { name, password, email, createdBy } = req.body; // 👈 Include createdBy
     const profileImage = req.file ? req.file.path : "";
 
-    const newProfile = new ProfileData({ pucNumber, profileImage, name, password, email });
+    const count = await ProfileData.countDocuments();
+    const pucNumber = `PUC${String(count + 1).padStart(3, "0")}`; // PUC001, PUC002
+
+    const newProfile = new ProfileData({
+      pucNumber,
+      profileImage,
+      name,
+      password,
+      email,
+      createdBy, // 👈 Save admin name
+    });
+
     await newProfile.save();
 
     res.status(201).json({ message: "Profile created successfully", data: newProfile });
@@ -32,6 +59,7 @@ router.post("/profile", upload.single("profileImage"), async (req, res) => {
     res.status(500).json({ message: "Error creating profile", error });
   }
 });
+
 
 
 // Update Profile
