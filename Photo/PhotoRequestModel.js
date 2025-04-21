@@ -11,6 +11,7 @@ const PhotoRequestSchema = new mongoose.Schema(
     city: { type: String },
     district: { type: String },
     area: { type: String },
+    totalArea: { type: Number },
     streetName: { type: String },
     bestTimeToCall: { type: String },
     length: { type: Number },
