@@ -152,7 +152,7 @@ const allAreas = allDistricts.flatMap((district) =>
 
 const AddSchema = new mongoose.Schema({
   phoneNumber: { type: String},
-  ppcId: { type: Number, unique:true },
+  ppcId: { type: Number},
 
   views: { type: Number, default: 0 },
 
@@ -181,11 +181,11 @@ const AddSchema = new mongoose.Schema({
   status: {
     type: String,
     enum: ['incomplete','active','pending', 'complete','sendInterest', 'soldOut', 'reportProperties', 'needHelp', 'contact', 'favorite', 'alreadySaved', 'favoriteRemoved', 'delete','undo'],
-    default: 'pending',
+    default: 'incomplete',
   },
   
 
-  previousStatus: { type: String, enum: ['pending', 'complete','delete','active'] }, 
+  previousStatus: { type: String, enum: ['incomplete', 'complete','delete','active'] }, 
 
   featureStatus: {
     type: String,

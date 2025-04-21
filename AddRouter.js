@@ -953,6 +953,44 @@ router.post(
   }
 );
 
+
+
+router.get('/fetch-all-datas', async (req, res) => {
+  try {
+    const requiredFields = [
+      'ppcId',
+      'phoneNumber',
+      'price',
+      'propertyMode',
+      'propertyType',
+      // 'areaUnit',
+      // 'salesType',
+      // 'totalArea',
+      // 'postedBy'
+    ];
+
+    // Build query to ensure all required fields are present and not empty
+    const query = {
+      $and: requiredFields.map(field => ({
+        [field]: { $exists: true, $ne: null, $ne: '' }
+      }))
+    };
+
+    const users = await AddModel.find(query);
+
+    res.status(200).json({
+      message: 'Filtered user data with all required fields fetched successfully!',
+      users
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: 'Error fetching user data with required fields.',
+      error: error.message
+    });
+  }
+});
+
+
 // router.post(
 //   '/update-property',
 //   upload.fields([{ name: 'video', maxCount: 1 }, { name: 'photos', maxCount: 15 }]),
@@ -1202,17 +1240,6 @@ router.get('/deleted-properties-count', async (req, res) => {
   }
 });
 
-// router.get('/pending-properties-count', async (req, res) => {
-//   try {
-//     // Count the documents with status "pending"
-//     const count = await AddModel.countDocuments({ status: "pending" });
-
-//     // Send the count as response
-//     res.json({ pendingProperties: count });
-//   } catch (error) {
-//     res.status(500).json({ error: error.message });
-//   }
-// });
 
 
 // GET: Count of pending properties
@@ -2366,25 +2393,25 @@ router.get('/fetch-data', async (req, res) => {
 // });
 
 
-router.get('/fetch-all-datas', async (req, res) => {
-  try {
-    // Delete all "incomplete" entries from DB
-    await AddModel.deleteMany({ status: 'incomplete' });
+// // router.get('/fetch-all-datas', async (req, res) => {
+//   try {
+//     // Delete all "incomplete" entries from DB
+//     await AddModel.deleteMany({ status: 'incomplete' });
 
-    // Fetch only "complete" entries
-    const users = await AddModel.find({ status: 'complete' });
+//     // Fetch only "complete" entries
+//     const users = await AddModel.find({ status: 'complete' });
 
-    res.status(200).json({
-      message: 'Only complete user data fetched successfully!',
-      users
-    });
-  } catch (error) {
-    res.status(500).json({
-      message: 'Error fetching user data.',
-      error
-    });
-  }
-});
+//     res.status(200).json({
+//       message: 'Only complete user data fetched successfully!',
+//       users
+//     });
+//   } catch (error) {
+//     res.status(500).json({
+//       message: 'Error fetching user data.',
+//       error
+//     });
+//   }
+// });
 
 
 // API to fetch distinct states from AddModel

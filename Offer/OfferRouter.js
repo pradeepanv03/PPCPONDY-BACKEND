@@ -6,39 +6,172 @@ const AddModel = require('../AddModel');
 const NotificationUser = require('../Notification/NotificationDetailModel');
 
 
+// router.get("/offers/owner/:phoneNumber", async (req, res) => {
+//     try {
+//         let { phoneNumber } = req.params;
+
+//         // Normalize phone number: remove non-numeric characters
+//         phoneNumber = phoneNumber.replace(/\D/g, "");
+
+//         // Prepare possible phone number formats
+//         const phoneVariants = [
+//             phoneNumber,           
+//             `91${phoneNumber}`,     
+//             `+91${phoneNumber}`     
+//         ];
+
+        
+//         // Find all offers by this buyer's phone number
+//         const buyerOffers = await Offer.find({ phoneNumber: { $in: phoneVariants } });
+
+
+//         if (!buyerOffers.length) {
+//             return res.status(404).json({ message: "No offers found for this buyer." });
+//         }
+
+//         // Get unique PPC IDs from the offers
+//         const uniquePpcIds = [...new Set(buyerOffers.map((offer) => offer.ppcId))];
+
+//         // Fetch matching property details in one query
+//         const properties = await AddModel.find({ ppcId: { $in: uniquePpcIds } }).lean();
+
+//         // Create a map for faster property lookup
+//         const propertyMap = new Map(properties.map((property) => [property.ppcId, property]));
+
+//         // Combine offer and property info
+//         const offersData = buyerOffers.map((offer) => {
+//             const property = propertyMap.get(offer.ppcId);
+//             return {
+//                 ppcId: offer.ppcId,
+//                 offeredPrice: offer.price,
+//                 buyerPhoneNumber: offer.phoneNumber,
+//                 originalPrice: offer.originalPrice || property.price || null,
+//                 propertyMode: property.propertyMode || null,
+//                 propertyType: property.propertyType || null,
+//                 bedrooms: property.bedrooms || null,
+//                 ownership: property.ownership || null,
+//                 originalPrice: property?.price || null,
+//                 propertyMode: property?.propertyMode || null,
+//                 propertyType: property?.propertyType || null,
+//                 postedUserPhoneNumber: property?.phoneNumber || null,
+//                 propertyPostedPhoneNumber: property.phoneNumber || offer.postedUserPhoneNumber || null ,
+//                 status: offer.status || "pending"
+//             };
+//         });
+
+//         // Respond with the combined offer/property data
+//         res.status(200).json({
+//             message: "Buyer’s offers fetched successfully.",
+//             offers: offersData
+//         });
+
+//     } catch (error) {
+//         res.status(500).json({
+//             message: "Error fetching buyer offers.",
+//             error: error.message
+//         });
+//     }
+// });
+
+// 📌 POST: Create or update an offer
+router.post('/offer', async (req, res) => {
+    try {
+        const { ppcId, phoneNumber, price } = req.body;
+
+        if (!ppcId || !phoneNumber || !price) {
+            return res.status(400).json({ message: "All fields are required: ppcId, phoneNumber, price" });
+        }
+
+        const numericPrice = Number(price);
+        if (isNaN(numericPrice) || numericPrice <= 0) {
+            return res.status(400).json({ message: "Invalid price. It must be a positive number." });
+        }
+
+        const property = await AddModel.findOne({ ppcId });
+        if (!property) {
+            return res.status(404).json({ message: "Property not found" });
+        }
+
+        const ownerPhone = property.phoneNumber;
+        const originalPrice = property.price;
+
+        let offer = await Offer.findOne({ ppcId, phoneNumber });
+
+        if (offer) {
+            offer.price = numericPrice;
+            offer.originalPrice = originalPrice;
+            offer.postedUserPhoneNumber = ownerPhone;
+            await offer.save();
+
+            // 🔔 Send Notification - Offer Updated
+            await NotificationUser.create({
+                recipientPhoneNumber: ownerPhone,
+                senderPhoneNumber: phoneNumber,
+                ppcId,
+                message: `User ${phoneNumber} updated their offer to ₹${numericPrice} for your property.`,
+                createdAt: new Date()
+            });
+
+            return res.status(200).json({
+                message: "Offer updated successfully",
+                offer
+            });
+        }
+
+        // New offer
+        offer = new Offer({
+            ppcId,
+            phoneNumber,
+            price: numericPrice,
+            status: 'pending',
+            originalPrice,
+            postedUserPhoneNumber: ownerPhone
+        });
+
+        await offer.save();
+
+        // 🔔 Send Notification - New Offer
+        await NotificationUser.create({
+            recipientPhoneNumber: ownerPhone,
+            senderPhoneNumber: phoneNumber,
+            ppcId,
+            message: `User ${phoneNumber} made a new offer of ₹${numericPrice} for your property.`,
+            createdAt: new Date()
+        });
+
+        res.status(201).json({
+            message: "Offer created successfully",
+            offer
+        });
+
+    } catch (error) {
+        res.status(500).json({ message: "Error processing offer", error: error.message });
+    }
+});
+
+// 📌 GET: Get all offers sent by a buyer to an owner's properties
 router.get("/offers/owner/:phoneNumber", async (req, res) => {
     try {
         let { phoneNumber } = req.params;
-
-        // Normalize phone number: remove non-numeric characters
         phoneNumber = phoneNumber.replace(/\D/g, "");
 
-        // Prepare possible phone number formats
         const phoneVariants = [
-            phoneNumber,           
-            `91${phoneNumber}`,     
-            `+91${phoneNumber}`     
+            phoneNumber,
+            `91${phoneNumber}`,
+            `+91${phoneNumber}`
         ];
 
-        
-        // Find all offers by this buyer's phone number
         const buyerOffers = await Offer.find({ phoneNumber: { $in: phoneVariants } });
-
 
         if (!buyerOffers.length) {
             return res.status(404).json({ message: "No offers found for this buyer." });
         }
 
-        // Get unique PPC IDs from the offers
         const uniquePpcIds = [...new Set(buyerOffers.map((offer) => offer.ppcId))];
 
-        // Fetch matching property details in one query
         const properties = await AddModel.find({ ppcId: { $in: uniquePpcIds } }).lean();
+        const propertyMap = new Map(properties.map((p) => [p.ppcId, p]));
 
-        // Create a map for faster property lookup
-        const propertyMap = new Map(properties.map((property) => [property.ppcId, property]));
-
-        // Combine offer and property info
         const offersData = buyerOffers.map((offer) => {
             const property = propertyMap.get(offer.ppcId);
             return {
@@ -47,13 +180,19 @@ router.get("/offers/owner/:phoneNumber", async (req, res) => {
                 buyerPhoneNumber: offer.phoneNumber,
                 originalPrice: property?.price || null,
                 propertyMode: property?.propertyMode || null,
+                totalArea: property?.totalArea || null,
+                areaUnit:property?.areaUnit || null,
                 propertyType: property?.propertyType || null,
-                postedUserPhoneNumber: property?.phoneNumber || null,
-                status: offer.status || "pending"
+                bedrooms: property?.bedrooms || null,
+                ownership: property?.ownership || null,
+                postedUserPhoneNumber: property?.phoneNumber || offer.postedUserPhoneNumber || null,
+                status: offer.status || "pending",
+                createdAt: offer.createdAt // ✅ Added this line
+
+
             };
         });
 
-        // Respond with the combined offer/property data
         res.status(200).json({
             message: "Buyer’s offers fetched successfully.",
             offers: offersData
@@ -96,86 +235,86 @@ router.get("/offers/owner/count/:phoneNumber", async (req, res) => {
 });
 
 
-router.post('/offer', async (req, res) => {
-    try {
-        const { ppcId, phoneNumber, price } = req.body;
+// router.post('/offer', async (req, res) => {
+//     try {
+//         const { ppcId, phoneNumber, price } = req.body;
 
-        if (!ppcId || !phoneNumber || !price) {
-            return res.status(400).json({ message: "All fields are required: ppcId, phoneNumber, price" });
-        }
+//         if (!ppcId || !phoneNumber || !price) {
+//             return res.status(400).json({ message: "All fields are required: ppcId, phoneNumber, price" });
+//         }
 
-        const numericPrice = Number(price);
-        if (isNaN(numericPrice) || numericPrice <= 0) {
-            return res.status(400).json({ message: "Invalid price. It must be a positive number." });
-        }
+//         const numericPrice = Number(price);
+//         if (isNaN(numericPrice) || numericPrice <= 0) {
+//             return res.status(400).json({ message: "Invalid price. It must be a positive number." });
+//         }
 
-        const property = await AddModel.findOne({ ppcId });
-        if (!property) {
-            return res.status(404).json({ message: "Property not found" });
-        }
+//         const property = await AddModel.findOne({ ppcId });
+//         if (!property) {
+//             return res.status(404).json({ message: "Property not found" });
+//         }
 
-        const ownerPhone = property.phoneNumber;
-        const originalPrice = property.price;
+//         const ownerPhone = property.phoneNumber;
+//         const originalPrice = property.price;
 
-        let existingOffer = await Offer.findOne({ ppcId, phoneNumber });
+//         let existingOffer = await Offer.findOne({ ppcId, phoneNumber });
 
-        if (existingOffer) {
-            existingOffer.price = numericPrice;
-            existingOffer.originalPrice = originalPrice;
-            existingOffer.postedUserPhoneNumber = ownerPhone;
-            await existingOffer.save();
+//         if (existingOffer) {
+//             existingOffer.price = numericPrice;
+//             existingOffer.originalPrice = originalPrice;
+//             existingOffer.postedUserPhoneNumber = ownerPhone;
+//             await existingOffer.save();
 
-            // ✅ Notification: Offer Updated
-            try {
-                await NotificationUser.create({
-                    recipientPhoneNumber: ownerPhone,
-                    senderPhoneNumber: phoneNumber,
-                    ppcId,
-                    message: `User ${phoneNumber} updated their offer to ₹${numericPrice} for your property.`,
-                    createdAt: new Date()
-                });
-            } catch (notifErr) {
-            }
+//             // ✅ Notification: Offer Updated
+//             try {
+//                 await NotificationUser.create({
+//                     recipientPhoneNumber: ownerPhone,
+//                     senderPhoneNumber: phoneNumber,
+//                     ppcId,
+//                     message: `User ${phoneNumber} updated their offer to ₹${numericPrice} for your property.`,
+//                     createdAt: new Date()
+//                 });
+//             } catch (notifErr) {
+//             }
 
-            return res.status(200).json({
-                message: "Offer updated successfully",
-                offer: existingOffer
-            });
-        }
+//             return res.status(200).json({
+//                 message: "Offer updated successfully",
+//                 offer: existingOffer
+//             });
+//         }
 
-        // Create new offer
-        const newOffer = new Offer({
-            ppcId,
-            phoneNumber,
-            price: numericPrice,
-            status: 'pending',
-            originalPrice,
-            postedUserPhoneNumber: ownerPhone
-        });
+//         // Create new offer
+//         const newOffer = new Offer({
+//             ppcId,
+//             phoneNumber,
+//             price: numericPrice,
+//             status: 'pending',
+//             originalPrice,
+//             postedUserPhoneNumber: ownerPhone
+//         });
 
-        await newOffer.save();
+//         await newOffer.save();
 
-        // ✅ Notification: New Offer
-        try {
-            await NotificationUser.create({
-                recipientPhoneNumber: ownerPhone,
-                senderPhoneNumber: phoneNumber,
-                ppcId,
-                message: `User ${phoneNumber} made a new offer of ₹${numericPrice} for your property.`,
-                createdAt: new Date()
-            });
-        } catch (notifErr) {
-        }
+//         // ✅ Notification: New Offer
+//         try {
+//             await NotificationUser.create({
+//                 recipientPhoneNumber: ownerPhone,
+//                 senderPhoneNumber: phoneNumber,
+//                 ppcId,
+//                 message: `User ${phoneNumber} made a new offer of ₹${numericPrice} for your property.`,
+//                 createdAt: new Date()
+//             });
+//         } catch (notifErr) {
+//         }
 
-        res.status(201).json({
-            message: "Offer created successfully",
-            offer: newOffer
-        });
+//         res.status(201).json({
+//             message: "Offer created successfully",
+//             offer: newOffer
+//         });
 
-    } catch (error) {
-        res.status(500).json({ message: "Error processing offer", error: error.message });
-    }
-});
+//     } catch (error) {
+//         res.status(500).json({ message: "Error processing offer", error: error.message });
+//     }
+// });
 
 
 
@@ -261,13 +400,28 @@ router.get('/offers/buyer/:phoneNumber', async (req, res) => {
         const offersData = ownerOffers.map(offer => {
             const property = propertiesByOwner.find(prop => prop.ppcId === offer.ppcId);
             return {
+                // ppcId: offer.ppcId,
+                // offeredPrice: offer.price,
+                // status: offer.status,
+                // buyerPhoneNumber: offer.phoneNumber,
+                // createdAt:offer.createdAt,
+                // postedUserPhoneNumber: property ? property.phoneNumber : null, // Owner's phone
+                // propertyDetails: property || {}
+
                 ppcId: offer.ppcId,
                 offeredPrice: offer.price,
-                status: offer.status,
                 buyerPhoneNumber: offer.phoneNumber,
-                createdAt:offer.createdAt,
-                postedUserPhoneNumber: property ? property.phoneNumber : null, // Owner's phone
-                propertyDetails: property || {}
+                originalPrice: property?.price || null,
+                propertyMode: property?.propertyMode || null,
+                totalArea: property?.totalArea || null,
+                areaUnit:property?.areaUnit || null,
+                propertyType: property?.propertyType || null,
+                bedrooms: property?.bedrooms || null,
+                ownership: property?.ownership || null,
+                postedUserPhoneNumber: property?.phoneNumber || offer.postedUserPhoneNumber || null,
+                status: offer.status || "pending",
+                createdAt: offer.createdAt // ✅ Added this line
+
             };
         });
 
@@ -631,12 +785,6 @@ router.put("/accept-offer/:id", async (req, res) => {
   
 
 module.exports = router;
-
-
-
-
-
-
 
 
 
