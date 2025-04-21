@@ -460,68 +460,6 @@ router.get("/user-get-all-last-views", async (req, res) => {
 });
 
 
-
-router.post("/user-viewed-property", async (req, res) => {
-  try {
-    const { phoneNumber, ppcId } = req.body;
-
-    if (!phoneNumber || !ppcId) {
-      return res.status(400).json({ message: "phoneNumber and ppcId are required" });
-    }
-
-    // Normalize phone number
-    const normalizedPhoneNumber = phoneNumber.replace(/\s+/g, "").replace(/\+/g, "");
-
-    // Check if the property exists
-    const property = await AddModel.findOne({ ppcId });
-    if (!property) {
-      return res.status(404).json({ message: "Property not found" });
-    }
-
-    const propertyOwnerPhoneNumber = property.phoneNumber;
-
-    // ✅ Step 1: Record the view in UserViews
-    let userViews = await UserViewsModel.findOne({ phoneNumber: normalizedPhoneNumber });
-
-    if (!userViews) {
-      userViews = new UserViewsModel({
-        phoneNumber: normalizedPhoneNumber,
-        viewedProperties: [
-          { ppcId, propertyOwnerPhoneNumber, viewedAt: new Date() },
-        ],
-      });
-    } else {
-      const alreadyViewed = userViews.viewedProperties.some((view) => view.ppcId === ppcId);
-      if (!alreadyViewed) {
-        userViews.viewedProperties.push({
-          ppcId,
-          propertyOwnerPhoneNumber,
-          viewedAt: new Date(),
-        });
-      }
-    }
-
-    await userViews.save();
-
-    // ✅ Step 2: Increment views in AddModel
-    await AddModel.updateOne({ ppcId }, { $inc: { views: 1 } });
-
-    // ✅ Step 3: Create a notification to the property owner
-    await NotificationUser.create({
-      recipientPhoneNumber: propertyOwnerPhoneNumber,
-      senderPhoneNumber: normalizedPhoneNumber,
-      message: `Your property (ID: ${ppcId}) was viewed by a user.`,
-      ppcId: ppcId,
-      createdAt: new Date(),
-    });
-
-    res.status(200).json({ message: "Property view recorded and notification sent" });
-  } catch (error) {
-    res.status(500).json({ message: "Internal Server Error", error: error.message });
-  }
-});
-
-
 router.get("/user-views-count", async (req, res) => {
   try {
     // Aggregate total number of views from all user documents
@@ -545,6 +483,8 @@ router.get("/user-views-count", async (req, res) => {
 });
 
 
+
+
 router.get("/user-viewed-properties", async (req, res) => {
   try {
     const { phoneNumber } = req.query;
@@ -553,21 +493,94 @@ router.get("/user-viewed-properties", async (req, res) => {
       return res.status(400).json({ message: "phoneNumber is required" });
     }
 
-    // Normalize phone number (remove spaces and '+')
     const normalizedPhoneNumber = phoneNumber.replace(/\s+/g, "").replace(/\+/g, "");
 
-    // Fetch the user's viewed properties
     const userViews = await UserViewsModel.findOne({ phoneNumber: normalizedPhoneNumber });
 
     if (!userViews || userViews.viewedProperties.length === 0) {
       return res.status(404).json({ message: "No viewed properties found" });
     }
 
-    res.status(200).json({ viewedProperties: userViews.viewedProperties });
+    const sortedViews = userViews.viewedProperties.sort(
+      (a, b) => new Date(b.viewedAt) - new Date(a.viewedAt)
+    );
+
+    // // Optional: fetch notifications for viewed properties
+    // const viewedPpcIds = sortedViews.map(view => view.ppcId);
+    // const relatedNotifications = await NotificationUser.find({
+    //   senderPhoneNumber: normalizedPhoneNumber,
+    //   ppcId: { $in: viewedPpcIds }
+    // }).sort({ createdAt: -1 });
+
+    res.status(200).json({
+      viewedProperties: sortedViews,
+      // notifications: relatedNotifications
+
+    });
   } catch (error) {
     res.status(500).json({ message: "Internal Server Error", error: error.message });
   }
 });
+
+
+
+
+router.post("/user-viewed-property", async (req, res) => {
+  try {
+    const { phoneNumber, ppcId } = req.body;
+
+    if (!phoneNumber || !ppcId) {
+      return res.status(400).json({ message: "phoneNumber and ppcId are required" });
+    }
+
+    const normalizedPhoneNumber = phoneNumber.replace(/\s+/g, "").replace(/\+/g, "");
+
+    const property = await AddModel.findOne({ ppcId });
+    if (!property) {
+      return res.status(404).json({ message: "Property not found" });
+    }
+
+    const propertyOwnerPhoneNumber = property.phoneNumber;
+
+    let userViews = await UserViewsModel.findOne({ phoneNumber: normalizedPhoneNumber });
+
+    const newViewEntry = {
+      ppcId,
+      viewerPhoneNumber: normalizedPhoneNumber,
+      propertyOwnerPhoneNumber,
+      viewedAt: new Date(),
+    };
+
+    if (!userViews) {
+      userViews = new UserViewsModel({
+        phoneNumber: normalizedPhoneNumber,
+        viewedProperties: [newViewEntry],
+      });
+    } else {
+      const alreadyViewed = userViews.viewedProperties.some(view => view.ppcId === ppcId);
+      if (!alreadyViewed) {
+        userViews.viewedProperties.push(newViewEntry);
+      }
+    }
+
+    await userViews.save();
+
+    await AddModel.updateOne({ ppcId }, { $inc: { views: 1 } });
+
+    await NotificationUser.create({
+      recipientPhoneNumber: propertyOwnerPhoneNumber,
+      senderPhoneNumber: normalizedPhoneNumber,
+      message: `Your property (ID: ${ppcId}) was viewed by a user.`,
+      ppcId: ppcId,
+      createdAt: new Date(),
+    });
+
+    res.status(200).json({ message: "Property view recorded and notification sent" });
+  } catch (error) {
+    res.status(500).json({ message: "Internal Server Error", error: error.message });
+  }
+});
+
 
 
 router.get("/all-viewed-properties", async (req, res) => {
