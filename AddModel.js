@@ -229,11 +229,9 @@ const AddSchema = new mongoose.Schema({
         'Registration Help',
         'Others'
       ],
-      required: true
     },
     comment: {
       type: String,
-      trim: true
     },
     requestedAt: { type: Date, default: Date.now }
   }],
@@ -242,7 +240,6 @@ const AddSchema = new mongoose.Schema({
   reportProperty: [{ phoneNumber: { type: String },
     reason: {
       type: String,
-      trim: true
     },
     // Enforce one of your preset reasons
     selectReasons: {
@@ -255,7 +252,6 @@ const AddSchema = new mongoose.Schema({
         'Duplicate Ads',
         'Other'
       ],
-      required: true
     },
     date: { type: Date, default: Date.now },
    }],
