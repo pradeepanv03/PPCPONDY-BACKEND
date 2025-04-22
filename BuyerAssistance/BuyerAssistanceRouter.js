@@ -193,6 +193,139 @@ router.get("/get-buyer-id/:phoneNumber", async (req, res) => {
 
 
 
+// router.post("/add-buyerAssistance", async (req, res) => {
+//   try {
+//     const { phoneNumber } = req.body;
+
+//     if (!phoneNumber) {
+//       return res.status(400).json({ message: "Phone number is required" });
+//     }
+
+//     // Normalize input: Remove country code if present
+//     let formattedPhoneNumber = phoneNumber.replace(/^\+91/, "").trim();
+
+//     // Check if user already has a ba_id
+//     let existingUser = await BuyerAssistance.findOne({ phoneNumber: formattedPhoneNumber });
+
+//     let newBaId;
+//     if (existingUser) {
+//       newBaId = existingUser.ba_id; // Reuse existing ba_id
+//     } else {
+//       // Find the latest `ba_id`
+//       let lastRecord = await BuyerAssistance.findOne({}, { ba_id: 1 }).sort({ ba_id: -1 });
+
+//       if (lastRecord && lastRecord.ba_id) {
+//         newBaId = lastRecord.ba_id + 1;
+//       } else {
+//         newBaId = 100; // Start from 100 if no records exist
+//       }
+//     }
+
+//     // Create a new Buyer Assistance request
+//     const newRequest = new BuyerAssistance({ 
+//       ...req.body, 
+//       baName: req.body.baName || "Buyer",
+//       phoneNumber: formattedPhoneNumber, 
+//       ba_id: newBaId
+//     });
+
+//     await newRequest.save();
+
+//     // ✅ Create notification (assume admin/support team uses "admin" as phone number)
+//     await NotificationUser.create({
+//       recipientPhoneNumber: phoneNumber, // Could be a group inbox, admin panel, or even dynamic
+//       senderPhoneNumber: formattedPhoneNumber,
+//       message: `New buyer assistance request submitted by ${formattedPhoneNumber}`,
+//       createdAt: new Date(),
+//     });
+
+//     res.status(201).json({ 
+//       message: "Buyer Assistance request added successfully!", 
+//       data: newRequest 
+//     });
+
+//   } catch (error) {
+//     res.status(500).json({ message: "Error adding Buyer Assistance request", error });
+//   }
+// });
+
+
+
+// router.post("/add-buyerAssistance", async (req, res) => {
+//   try {
+//     const { phoneNumber } = req.body;
+
+//     if (!phoneNumber) {
+//       return res.status(400).json({ message: "Phone number is required" });
+//     }
+
+//     let formattedPhoneNumber = phoneNumber.replace(/^\+91/, "").trim();
+
+//     // Check if user already has a ba_id
+//     let existingUser = await BuyerAssistance.findOne({ phoneNumber: formattedPhoneNumber });
+
+//     let newBaId;
+//     if (existingUser) {
+//       newBaId = existingUser.ba_id;
+//     } else {
+//       let lastRecord = await BuyerAssistance.findOne({}, { ba_id: 1 }).sort({ ba_id: -1 });
+//       newBaId = lastRecord && lastRecord.ba_id ? lastRecord.ba_id + 1 : 100;
+//     }
+
+//     const newRequest = new BuyerAssistance({ 
+//       ...req.body, 
+//       baName: req.body.baName || "Buyer",
+//       phoneNumber: formattedPhoneNumber,
+//       ba_id: newBaId
+//     });
+
+//     await newRequest.save();
+
+//     // Notify Admin/Support
+//     await NotificationUser.create({
+//       recipientPhoneNumber: "admin",
+//       senderPhoneNumber: formattedPhoneNumber,
+//       message: `New buyer assistance request submitted by ${formattedPhoneNumber}`,
+//       createdAt: new Date(),
+//     });
+
+//     // 🔔 Notify matching property owners
+//     const matchedProperties = await AddModel.find({
+//       propertyMode: newRequest.propertyMode,
+//       propertyType: newRequest.propertyType,
+//       city: newRequest.city,
+//       area: newRequest.area,
+//       facing: newRequest.facing,
+//       price: {
+//         $gte: Number(newRequest.minPrice),
+//         $lte: Number(newRequest.maxPrice)
+//       }
+//     });
+
+//     for (let property of matchedProperties) {
+//       await NotificationUser.create({
+//         recipientPhoneNumber: property.phoneNumber,
+//         senderPhoneNumber: formattedPhoneNumber,
+//         message: `A new buyer request matches your property in ${property.area} (${property.propertyType})`,
+//         createdAt: new Date(),
+//       });
+//     }
+
+//     res.status(201).json({ 
+//       message: "Buyer Assistance request added successfully!", 
+//       data: newRequest 
+//     });
+
+//   } catch (error) {
+//     res.status(500).json({ message: "Error adding Buyer Assistance request", error });
+//   }
+// });
+
+
+
+
+
+
 router.post("/add-buyerAssistance", async (req, res) => {
   try {
     const { phoneNumber } = req.body;
@@ -201,7 +334,6 @@ router.post("/add-buyerAssistance", async (req, res) => {
       return res.status(400).json({ message: "Phone number is required" });
     }
 
-    // Normalize input: Remove country code if present
     let formattedPhoneNumber = phoneNumber.replace(/^\+91/, "").trim();
 
     // Check if user already has a ba_id
@@ -209,35 +341,61 @@ router.post("/add-buyerAssistance", async (req, res) => {
 
     let newBaId;
     if (existingUser) {
-      newBaId = existingUser.ba_id; // Reuse existing ba_id
+      newBaId = existingUser.ba_id;
     } else {
-      // Find the latest `ba_id`
       let lastRecord = await BuyerAssistance.findOne({}, { ba_id: 1 }).sort({ ba_id: -1 });
-
-      if (lastRecord && lastRecord.ba_id) {
-        newBaId = lastRecord.ba_id + 1;
-      } else {
-        newBaId = 100; // Start from 100 if no records exist
-      }
+      newBaId = lastRecord && lastRecord.ba_id ? lastRecord.ba_id + 1 : 100;
     }
 
-    // Create a new Buyer Assistance request
     const newRequest = new BuyerAssistance({ 
       ...req.body, 
       baName: req.body.baName || "Buyer",
-      phoneNumber: formattedPhoneNumber, 
+      phoneNumber: formattedPhoneNumber,
       ba_id: newBaId
     });
 
     await newRequest.save();
 
-    // ✅ Create notification (assume admin/support team uses "admin" as phone number)
+    // Notify Admin/Support
     await NotificationUser.create({
-      recipientPhoneNumber: phoneNumber, // Could be a group inbox, admin panel, or even dynamic
+      recipientPhoneNumber: "admin",
       senderPhoneNumber: formattedPhoneNumber,
       message: `New buyer assistance request submitted by ${formattedPhoneNumber}`,
       createdAt: new Date(),
     });
+
+    // Find matched properties
+    const matchedProperties = await AddModel.find({
+      propertyMode: newRequest.propertyMode,
+      propertyType: newRequest.propertyType,
+      city: newRequest.city,
+      area: newRequest.area,
+      facing: newRequest.facing,
+      price: {
+        $gte: Number(newRequest.minPrice),
+        $lte: Number(newRequest.maxPrice)
+      }
+    });
+
+    // 🔔 Notify matching owners
+    for (let property of matchedProperties) {
+      await NotificationUser.create({
+        recipientPhoneNumber: property.phoneNumber,
+        senderPhoneNumber: formattedPhoneNumber,
+        message: `A new buyer request matches your property in ${property.area} (${property.propertyType})`,
+        createdAt: new Date(),
+      });
+    }
+
+    // 🔔 Notify the buyer (if any matching properties found)
+    if (matchedProperties.length > 0) {
+      await NotificationUser.create({
+        recipientPhoneNumber: formattedPhoneNumber,
+        senderPhoneNumber: "system",
+        message: `We found ${matchedProperties.length} matching property(s) for your request in ${newRequest.area} (${newRequest.propertyType}). Check them out now!`,
+        createdAt: new Date(),
+      });
+    }
 
     res.status(201).json({ 
       message: "Buyer Assistance request added successfully!", 
@@ -245,9 +403,12 @@ router.post("/add-buyerAssistance", async (req, res) => {
     });
 
   } catch (error) {
+    console.error("Error adding buyer assistance request:", error);
     res.status(500).json({ message: "Error adding Buyer Assistance request", error });
   }
 });
+
+
 
 router.get("/buyer-assistance-count", async (req, res) => {
   try {
@@ -368,6 +529,26 @@ router.get("/get-buyerAssistance/:phoneNumber", async (req, res) => {
     });
   }
 });
+
+
+// Get count of Buyer Assistance Requests by Phone Number
+router.get("/count-buyerAssistance/:phoneNumber", async (req, res) => {
+  const { phoneNumber } = req.params;
+
+  try {
+    const count = await BuyerAssistance.countDocuments({ phoneNumber });
+    res.status(200).json({
+      message: `Buyer Assistance request count fetched for phone number: ${phoneNumber}`,
+      count,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Error fetching Buyer Assistance request count by phone number",
+      error,
+    });
+  }
+});
+
 
 
 // Update Buyer Assistance
@@ -586,6 +767,8 @@ const normalizePhone = (phone) => {
 };
 
 
+
+
 router.get("/fetch-owner-matched-properties", async (req, res) => {
   try {
     let { phoneNumber } = req.query;
@@ -637,6 +820,7 @@ router.get("/fetch-owner-matched-properties", async (req, res) => {
     res.status(500).json({ message: "Server error", error });
   }
 });
+
 
 
 router.get("/fetch-matched-buyers-for-owner", async (req, res) => {
