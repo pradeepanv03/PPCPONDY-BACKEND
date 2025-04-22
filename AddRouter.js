@@ -1898,22 +1898,44 @@ router.get('/latest-ppcid', async (req, res) => {
 });
 
 
-router.post("/store-id", async (req, res) => {
+router.post('/store-data', async (req, res) => {
+  const { phoneNumber } = req.body;
+
+  if (!phoneNumber) {
+    return res.status(400).json({ message: 'Phone number is required.' });
+  }
+
   try {
+    // Check for an incomplete entry for this phone number
+    const existingIncomplete = await AddModel.findOne({
+      phoneNumber,
+      $or: [
+        { propertyMode: { $in: [null, ''] } },
+        { propertyType: { $in: [null, ''] } },
+        { price: { $in: [null, ''] } }
+      ]
+    });
 
+    if (existingIncomplete) {
+      return res.status(200).json({
+        message: 'Existing incomplete entry found.',
+        ppcId: existingIncomplete.ppcId
+      });
+    }
+
+    // Generate new PPC-ID
     const latestProperty = await AddModel.findOne().sort({ ppcId: -1 });
-
     const nextPpcId = latestProperty ? latestProperty.ppcId + 1 : 1001;
 
-    const newUser = new AddModel({ ppcId: nextPpcId });
-    const savedUser = await newUser.save();
+    // Create and save new user
+    const newUser = new AddModel({ phoneNumber, ppcId: nextPpcId });
+    await newUser.save();
 
-    res.status(201).json({ message: "PPC-ID created and stored successfully!", ppcId: nextPpcId });
+    res.status(201).json({ message: 'New PPC-ID created.', ppcId: nextPpcId });
   } catch (error) {
-    res.status(500).json({ message: "Error storing PPC-ID.", error });
+    res.status(500).json({ message: 'Error storing user details.', error });
   }
 });
-
 
 router.get('/get-latest-ppcid', async (req, res) => {
   try {
