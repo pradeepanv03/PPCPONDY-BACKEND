@@ -128,11 +128,11 @@ router.post('/user/register', async (req, res) => {
       }
 
       if (user.status === 'banned') {
-        return res.status(403).json({ message: 'Your account is banned. Contact support.' });
+        return res.status(403).json({ message: 'Your account is banned. Contact support. 9150524409' });
       }
 
       if (user.status === 'deleted') {
-        return res.status(403).json({ message: 'Your account is deleted. Please contact support.' });
+        return res.status(403).json({ message: 'Your account is deleted. Please contact support. 9150524409' });
       }
 
       // Update existing user
@@ -174,6 +174,8 @@ router.post('/user/register', async (req, res) => {
     return res.status(500).json({ message: 'Something went wrong', error: error.message });
   }
 });
+
+
 
 router.get('/user/login-mode-count', async (req, res) => {
   try {
@@ -370,6 +372,7 @@ router.get('/user/all', async (req, res) => {
   }
 });
 
+
 router.post('/user/report', async (req, res) => {
   const { phone, issueDetails } = req.body;
 
@@ -429,6 +432,8 @@ router.post('/user/ban', async (req, res) => {
     return res.status(500).json({ message: 'Something went wrong', error: error.message });
   }
 });
+
+
 
 router.post('/user/toggleStatus', async (req, res) => {
   const { phone, action, reason } = req.body;

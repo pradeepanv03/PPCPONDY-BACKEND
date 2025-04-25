@@ -52,6 +52,11 @@ const AdminLoginSchema = mongoose.Schema({
         required: true, 
         enum: ['manager', 'admin', 'accountant'], 
     },
+    // permissions: {
+    //     type: Map,
+    //     of: Boolean,
+    //     default: {}
+    //   },
     userType: {
         type: String,
         required: true, 

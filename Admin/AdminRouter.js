@@ -3,29 +3,68 @@ const router = express.Router();
 const AdminLogin = require('../Admin/AdminModel')
 const ProfileData = require("../MyProfile/ProfileModel");
 
-// Admin login route (POST /login)
+
+// // Admin login route (POST /login)
+// router.post('/adminlogin', async (req, res) => {
+//     const { name, password } = req.body;
+
+//     try {
+//         // Find the admin by name
+//         const admin = await AdminLogin.findOne({ name,password });
+//         if (!admin) {
+//             return res.status(400).json({ message: 'Invalid credentials' });
+//         }
+
+//         // Compare password (you would hash the password in a real app)
+//         if (admin.password !== password) {
+//             return res.status(400).json({ message: 'Invalid credentials' });
+//         }
+
+//         // Respond with a success message and token (implement JWT or session handling here)
+//         return res.status(200).json({ message: 'Login successful', data: admin });
+
+//     } catch (error) {
+//         return res.status(500).json({ message: 'Something went wrong', error: error.message });
+//     }
+// });
+
+
+// Admin login route (POST /adminlogin)
 router.post('/adminlogin', async (req, res) => {
-    const { name, password } = req.body;
+    const { name, password, role, userType } = req.body;
 
     try {
-        // Find the admin by name
-        const admin = await AdminLogin.findOne({ name,password });
+        // Find the admin by name only
+        const admin = await AdminLogin.findOne({ name });
         if (!admin) {
             return res.status(400).json({ message: 'Invalid credentials' });
         }
 
-        // Compare password (you would hash the password in a real app)
-        if (admin.password !== password) {
+        // Check password, role, and userType
+        if (
+            admin.password !== password || 
+            admin.role !== role || 
+            admin.userType !== userType
+        ) {
             return res.status(400).json({ message: 'Invalid credentials' });
         }
 
-        // Respond with a success message and token (implement JWT or session handling here)
-        return res.status(200).json({ message: 'Login successful', data: admin });
+        // Success response
+        return res.status(200).json({ 
+            message: 'Login successful', 
+            data: {
+                name: admin.name,
+                role: admin.role,
+                userType: admin.userType
+            }
+        });
 
     } catch (error) {
         return res.status(500).json({ message: 'Something went wrong', error: error.message });
     }
 });
+
+
 
 router.get('/get-admin-logs', async (req, res) => {
     const { page = 1, limit = 10 } = req.query; // Set default page and limit

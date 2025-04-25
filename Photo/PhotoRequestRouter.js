@@ -331,6 +331,9 @@ router.get("/photo-requests/owner/:phoneNumber", async (req, res) => {
           areaunit:property.areaUnit || "N/A",
           status: request.status,
           photos: property.photos || [],
+          
+          photoURL: request.photoURL || null,
+
           postedUserPhoneNumber: request.postedUserPhoneNumber || "N/A",
           createdAt: request.createdAt || null,
           updatedAt: request.updatedAt || null,
@@ -376,10 +379,11 @@ router.get("/photo-requests/buyer/:phoneNumber", async (req, res) => {
                     propertyMode: property?.propertyMode || "",
                     price: property?.price || 0,
                     propertyType: property?.propertyType || "",
-                    totalArea:property.totalArea,
-                    bedrooms:property.bedrooms,
-                    ownership:property.ownership,
-                    bestTimeToCall:property.bestTimeToCall,
+                    // totalArea:property.totalArea,
+                    // bedrooms:property.bedrooms,
+                    // ownership:property.ownership,
+                    // bestTimeToCall:property.bestTimeToCall,
+                    city:property?.city || "",
                     status: request.status,
                     createdAt: request.createdAt,
                     updatedAt: request.updatedAt,
@@ -396,14 +400,6 @@ router.get("/photo-requests/buyer/:phoneNumber", async (req, res) => {
     }
 });
 
-
-
-
-
-
-
-
-
 // ✅ Fetch Photo Request Count for an Owner
 router.get("/photo-requests/owner/count/:phoneNumber", async (req, res) => {
   try {
@@ -417,9 +413,12 @@ router.get("/photo-requests/owner/count/:phoneNumber", async (req, res) => {
       // Count photo requests received by the property owner
       const photoRequestCount = await PhotoRequest.countDocuments({
           $or: [
-              { postedUserPhoneNumber: phoneNumber },
-              { postedUserPhoneNumber: `+91${phoneNumber}` },
-              { postedUserPhoneNumber: `91${phoneNumber}` }
+              { requesterPhoneNumber
+                : phoneNumber },
+              { requesterPhoneNumber
+                : `+91${phoneNumber}` },
+              { requesterPhoneNumber
+                : `91${phoneNumber}` }
           ]
       });
 

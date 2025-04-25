@@ -3057,6 +3057,74 @@ router.get('/get-all-favorite-requests', async (req, res) => {
 });
 
 
+
+
+router.get("/get-all-favorite-removed", async (req, res) => {
+  try {
+      // Fetch all properties where `favoriteRemoved` contains entries
+      const properties = await AddModel.find({ "favoriteRemoved.0": { $exists: true } });
+
+      // Format the response data
+      const favoriteRemovedData = properties.map((property) => ({
+        ppcId: property.ppcId,
+        postedUserPhoneNumber: property.phoneNumber,
+          ownerName: property.ownerName,
+          propertyMode: property.propertyMode,
+          propertyType: property.propertyType,
+          price: property.price,
+          area: property.area,
+          city: property.city,
+          createdAt: property.createdAt,
+          updatedAt: property.updatedAt,
+          favoriteRemoved: property.favoriteRemoved.map((fav) => ({
+              phoneNumber: fav.phoneNumber,
+              removedAt: fav.removedAt,
+          })),
+      }));
+
+      res.status(200).json({
+          message: "Favorite removed data fetched successfully!",
+          data: favoriteRemovedData,
+      });
+  } catch (error) {
+      console.error("Error fetching favorite removed data:", error);
+      res.status(500).json({ message: "Internal Server Error", error: error.message });
+  }
+});
+
+router.delete("/delete-favorite-remove/:ppcId", async (req, res) => {
+  const { ppcId } = req.params;
+
+  if (!ppcId) {
+    return res.status(400).json({ message: "Property ID is required" });
+  }
+
+  try {
+    // Find and delete the property by `ppcId`
+    const property = await AddModel.findOneAndDelete({ ppcId });
+
+    if (!property) {
+      return res.status(404).json({ message: "Property not found" });
+    }
+
+    res.status(200).json({
+      message: "Property deleted successfully!",
+      deletedProperty: {
+        ppcId: property.ppcId,
+        ownerName: property.ownerName,
+        propertyMode: property.propertyMode,
+        propertyType: property.propertyType,
+        price: property.price,
+        area: property.area,
+        city: property.city,
+      },
+    });
+  } catch (error) {
+    console.error("Error deleting property:", error);
+    res.status(500).json({ message: "Internal Server Error", error: error.message });
+  }
+});
+
 // Delete a favorite request for a specific property (ppcId)
 router.delete('/delete-favorite/:ppcId', async (req, res) => {
     try {

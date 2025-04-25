@@ -1943,21 +1943,46 @@ router.get('/latest-ppcid', async (req, res) => {
 });
 
 
+// router.post("/store-id", async (req, res) => {
+//   try {
+
+//     const latestProperty = await AddModel.findOne().sort({ ppcId: -1 });
+
+//     const nextPpcId = latestProperty ? latestProperty.ppcId + 1 : 1001;
+
+//     const newUser = new AddModel({ ppcId: nextPpcId });
+//     const savedUser = await newUser.save();
+
+//     res.status(201).json({ message: "PPC-ID created and stored successfully!", ppcId: nextPpcId });
+//   } catch (error) {
+//     res.status(500).json({ message: "Error storing PPC-ID.", error });
+//   }
+// });
+
+
 router.post("/store-id", async (req, res) => {
   try {
-
+    // Get the latest property to calculate the next PPC-ID
     const latestProperty = await AddModel.findOne().sort({ ppcId: -1 });
 
     const nextPpcId = latestProperty ? latestProperty.ppcId + 1 : 1001;
 
-    const newUser = new AddModel({ ppcId: nextPpcId });
+    // Create new user with the next PPC-ID and set 'createdBy' to 'Admin'
+    const newUser = new AddModel({
+      ppcId: nextPpcId,
+      createdBy: 'Admin',  // Override default 'User' with 'Admin'
+    });
+
+    // Save the new user to the database
     const savedUser = await newUser.save();
 
+    // Respond with the created PPC-ID
     res.status(201).json({ message: "PPC-ID created and stored successfully!", ppcId: nextPpcId });
   } catch (error) {
     res.status(500).json({ message: "Error storing PPC-ID.", error });
   }
 });
+
 
 
 router.get('/get-latest-ppcid', async (req, res) => {
@@ -2084,25 +2109,25 @@ router.delete('/delete-viewed-property/:ppcId', async (req, res) => {
 
 
 
-// Store new user data without PPC-ID
-router.post('/store-phone', async (req, res) => {
-    const { phoneNumber } = req.body;
+// // Store new user data without PPC-ID
+// router.post('/store-phone', async (req, res) => {
+//     const { phoneNumber } = req.body;
   
-    if (!phoneNumber) {
-      return res.status(400).json({ message: 'Phone number is required.' });
-    }
+//     if (!phoneNumber) {
+//       return res.status(400).json({ message: 'Phone number is required.' });
+//     }
   
-    try {
+//     try {
   
-      // Create new user with the provided phone number
-      const newUser = new AddModel({ phoneNumber });
-      await newUser.save();
+//       // Create new user with the provided phone number
+//       const newUser = new AddModel({ phoneNumber });
+//       await newUser.save();
   
-      res.status(201).json({ message: 'User added successfully!' });
-    } catch (error) {
-      res.status(500).json({ message: 'Error storing user details.', error });
-    }
-  });
+//       res.status(201).json({ message: 'User added successfully!' });
+//     } catch (error) {
+//       res.status(500).json({ message: 'Error storing user details.', error });
+//     }
+//   });
   
 
 
@@ -2136,7 +2161,7 @@ router.post('/store-phone', async (req, res) => {
       const nextPpcId = latestProperty ? latestProperty.ppcId + 1 : 1001;
   
       // Create and save new user
-      const newUser = new AddModel({ phoneNumber, ppcId: nextPpcId });
+      const newUser = new AddModel({ phoneNumber, ppcId: nextPpcId,createdBy: 'User' });
       await newUser.save();
   
       res.status(201).json({ message: 'New PPC-ID created.', ppcId: nextPpcId });
@@ -2145,29 +2170,48 @@ router.post('/store-phone', async (req, res) => {
     }
   });
 
-  
-  
-// router.post('/store-data', async (req, res) => {
-//   const { phoneNumber } = req.body;
 
-//   if (!phoneNumber) {
-//     return res.status(400).json({ message: 'Phone number is required.' });
-//   }
 
-//   try {
-//     // Fetch the latest PPC-ID
-//     const latestProperty = await AddModel.findOne().sort({ ppcId: -1 });
-//     const nextPpcId = latestProperty ? latestProperty.ppcId + 1 : 1001;
+router.post('/store-phone', async (req, res) => {
+  const { phoneNumber } = req.body;
 
-//     // Create and save new user
-//     const newUser = new AddModel({ phoneNumber, ppcId: nextPpcId });
-//     await newUser.save();
+  if (!phoneNumber) {
+    return res.status(400).json({ message: 'Phone number is required.' });
+  }
 
-//     res.status(201).json({ message: 'User added successfully!', ppcId: nextPpcId });
-//   } catch (error) {
-//     res.status(500).json({ message: 'Error storing user details.', error });
-//   }
-// });
+  try {
+    // Check for an incomplete entry for this phone number
+    const existingIncomplete = await AddModel.findOne({
+      phoneNumber,
+      $or: [
+        { propertyMode: { $in: [null, ''] } },
+        { propertyType: { $in: [null, ''] } },
+        { price: { $in: [null, ''] } }
+      ]
+    });
+
+    if (existingIncomplete) {
+      return res.status(200).json({
+        message: 'Existing incomplete entry found.',
+        ppcId: existingIncomplete.ppcId
+      });
+    }
+
+    // Generate new PPC-ID
+    const latestProperty = await AddModel.findOne().sort({ ppcId: -1 });
+    const nextPpcId = latestProperty ? latestProperty.ppcId + 1 : 1001;
+
+    // Create and save new user
+    const newUser = new AddModel({ phoneNumber, ppcId: nextPpcId,createdBy: 'Admin' });
+    await newUser.save();
+
+    res.status(201).json({ message: 'New PPC-ID created.', ppcId: nextPpcId });
+  } catch (error) {
+    res.status(500).json({ message: 'Error storing user details.', error });
+  }
+});
+
+
 
 
 
@@ -2471,6 +2515,39 @@ router.get('/fetch-data', async (req, res) => {
 });
 
 
+router.get('/fetch-alls-datas', async (req, res) => {
+  try {
+    const users = await AddModel.find({});
+
+    const requiredFields = [
+      'propertyMode', 'propertyType', 'price',
+      'totalArea', 'areaUnit',
+      'salesType', 'postedBy'
+    ];
+
+    const processedUsers = users.map((user) => {
+      // Check if all required fields are non-empty and not null/undefined
+      const isComplete = requiredFields.every(
+        (field) =>
+          user[field] !== undefined &&
+          user[field] !== null &&
+          String(user[field]).trim() !== ''
+      );
+
+      return {
+        ...user._doc,
+        required: isComplete ? "yes" : "no",
+      };
+    });
+
+    res.status(200).json({
+      message: "All user data fetched successfully!",
+      users: processedUsers
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching all user details.', error });
+  }
+});
 
 
 

@@ -272,6 +272,12 @@ const AddSchema = new mongoose.Schema({
     date: { type: Date, default: Date.now },
    }],
 
+   createdBy: {
+    type: String,
+    default: 'User'
+  },
+  
+
   bankLoan: { type: String },
   negotiation: { type: String },
 

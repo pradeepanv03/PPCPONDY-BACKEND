@@ -29,6 +29,11 @@ const ContactUsRouter =require('./ContactUs/ContactUsRouter');
 const TextRouter = require ('./TextEdider/TextRouter')
 const NotificationRouter = require('./Notification/NotificationRouter'); // Import Notification model
 const VisitAdminRouter = require ('./visit/VisitAdminRouter')
+const AdminRollRouter = require ('./AdminRolls/AdminRollRouter')
+const PaymentTypeRouter = require ('./Payment/PaymentTypeRouter')
+const FollowUpRouter = require ('./FollowUp/FollowUpRouter')
+
+
 
 const app = express();
 const port = process.env.PORT || 5006;
@@ -110,6 +115,9 @@ app.use('/PPC',ContactUsRouter);
 app.use('/PPC', TextRouter)
 app.use('/PPC',NotificationRouter);
 app.use('/PPC',VisitAdminRouter);
+app.use('/PPC',AdminRollRouter);
+app.use('/PPC',PaymentTypeRouter);
+app.use('/PPC',FollowUpRouter);
 
 
 // 404 Error Handling Middleware
