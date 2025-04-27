@@ -30,6 +30,8 @@ router.get("/plans/:phoneNumber", async (req, res) => {
     }
 });
 
+
+
 // ✅ Get plan count for a specific phone number
 router.get("/plans/count/:phoneNumber", async (req, res) => {
     try {
@@ -252,6 +254,46 @@ router.get("/all-selected-plans", async (req, res) => {
     }
 });
 
+router.get("/fetch-plan-by-phone", async (req, res) => {
+    try {
+        // Step 1: Extract phoneNumber from the request query
+        const { phoneNumber } = req.query;
+
+        // Step 2: Find the plan for the user with the given phone number
+        const plan = await PricingPlans.findOne({ phoneNumber });
+
+        // If the plan is not found
+        if (!plan) {
+            return res.status(404).json({ message: 'No plan found for this phone number.' });
+        }
+
+        // Step 3: Calculate the expiry date based on the createdAt and durationDays
+        const createdAt = new Date(plan.createdAt);
+        const duration = plan.durationDays || 0; // Default to 0 if durationDays is undefined
+
+        const expiryDate = new Date(createdAt);
+        expiryDate.setDate(expiryDate.getDate() + duration);
+
+        // Step 4: Return plan details including expiry date
+        return res.status(200).json({
+            status: "success",
+            phoneNumber: plan.phoneNumber,
+            planName: plan.name,
+            packageType: plan.packageType,
+            durationDays: plan.durationDays,
+            price: plan.price,
+            createdAt: plan.createdAt,
+            expiryDate: expiryDate.toISOString().split("T")[0], // Format as YYYY-MM-DD
+        });
+    } catch (error) {
+        // Error handling
+        return res.status(500).json({
+            status: "error",
+            message: "Failed to fetch plan by phone number.",
+            error: error.message
+        });
+    }
+});
 
 
 router.get('/plans', async (req, res) => {

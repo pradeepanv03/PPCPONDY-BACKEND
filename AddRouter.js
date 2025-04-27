@@ -8,7 +8,7 @@ const CallUserList = require('./CalledUserModel');
 const NotificationUser = require('./Notification/NotificationDetailModel');
 const DeletedAddModel = require ('./DeleteModel');
 const UserLogin = require('./user/UserModel'); 
-
+const PricingPlans = require('./plans/PricingPlanModel');
 
 
 const multer = require('multer');
@@ -2515,10 +2515,45 @@ router.get('/fetch-data', async (req, res) => {
 });
 
 
+// router.get('/fetch-alls-datas', async (req, res) => {
+//   try {
+//     const users = await AddModel.find({});
+// w
+//     const requiredFields = [
+//       'propertyMode', 'propertyType', 'price',
+//       'totalArea', 'areaUnit',
+//       'salesType', 'postedBy'
+//     ];
+
+//     const processedUsers = users.map((user) => {
+//       // Check if all required fields are non-empty and not null/undefined
+//       const isComplete = requiredFields.every(
+//         (field) =>
+//           user[field] !== undefined &&
+//           user[field] !== null &&
+//           String(user[field]).trim() !== ''
+//       );
+
+//       return {
+//         ...user._doc,
+//         required: isComplete ? "yes" : "no",
+//       };
+//     });
+
+//     res.status(200).json({
+//       message: "All user data fetched successfully!",
+//       users: processedUsers
+//     });
+//   } catch (error) {
+//     res.status(500).json({ message: 'Error fetching all user details.', error });
+//   }
+// });
+
+
 router.get('/fetch-alls-datas', async (req, res) => {
   try {
     const users = await AddModel.find({});
-w
+
     const requiredFields = [
       'propertyMode', 'propertyType', 'price',
       'totalArea', 'areaUnit',
@@ -2526,7 +2561,6 @@ w
     ];
 
     const processedUsers = users.map((user) => {
-      // Check if all required fields are non-empty and not null/undefined
       const isComplete = requiredFields.every(
         (field) =>
           user[field] !== undefined &&
@@ -2545,10 +2579,10 @@ w
       users: processedUsers
     });
   } catch (error) {
-    res.status(500).json({ message: 'Error fetching all user details.', error });
+    console.error('Error fetching all user details:', error); // add console for debugging
+    res.status(500).json({ message: 'Error fetching all user details.', error: error.message });
   }
 });
-
 
 
 // Common function to fetch active users by postedBy type
@@ -2591,6 +2625,89 @@ router.get('/fetch-active-developer', (req, res) => {
 router.get('/fetch-active-promotor', (req, res) => {
   fetchActiveUsersByType(req, res, 'Promotor');
 });
+
+
+
+
+
+
+// router.get('/fetch-free-plan-properties', async (req, res) => {
+//   try {
+//     // 1. Find all users who have Free Plan
+//     const freePlanUsers = await PricingPlans.find({ name: "Free" });
+
+//     if (!freePlanUsers.length) {
+//       return res.status(404).json({ message: 'No users found with Free Plan.' });
+//     }
+
+//     // 2. Extract phoneNumbers from Free Plan users (assuming phoneNumbers is an array)
+//     const phoneNumbers = freePlanUsers.flatMap(user => user.phoneNumber); // Flattening in case of an array
+
+//     // 3. Find properties posted by these phoneNumbers
+//     const properties = await AddModel.find({ phoneNumber: { $in: phoneNumbers } });
+
+//     res.status(200).json({
+//       message: "Properties posted by Free Plan users fetched successfully!",
+//       freePlanUsers: freePlanUsers, // plan user details
+//       properties: properties         // their posted properties
+//     });
+
+//   } catch (error) {
+//     console.error('Error fetching Free Plan user properties:', error);
+//     res.status(500).json({ message: 'Error fetching Free Plan user properties.', error: error.message });
+//   }
+// });
+
+
+router.get('/fetch-free-plan-properties', async (req, res) => {
+  try {
+    // 1. Find all users who have Free Plan
+    const freePlanUsers = await PricingPlans.find({ name: "Free" });
+
+    if (!freePlanUsers.length) {
+      return res.status(404).json({ message: 'No users found with Free Plan.' });
+    }
+
+    // 2. Extract phoneNumbers from Free Plan users
+    const phoneNumbers = freePlanUsers.flatMap(user => user.phoneNumber); // Flattening in case of an array
+
+    // 3. Find properties posted by these phoneNumbers
+    const properties = await AddModel.find({ phoneNumber: { $in: phoneNumbers } });
+
+    // Map properties to include the additional fields for display
+    const enhancedProperties = properties.map((property) => {
+      // Ensure we have the plan-related fields in each property
+      const freePlanUser = freePlanUsers.find(user => user.phoneNumber === property.phoneNumber);
+
+      // Add extra plan details like plan created date, duration, and expiry
+      const planCreatedAt = freePlanUser ? freePlanUser.planCreatedAt : null;
+      const durationDays = freePlanUser ? freePlanUser.durationDays : null;
+      const planExpiryDate = planCreatedAt && durationDays
+        ? new Date(planCreatedAt).setDate(new Date(planCreatedAt).getDate() + durationDays)
+        : null;
+
+      return {
+        ...property.toObject(),
+        planCreatedAt,
+        durationDays,
+        planExpiryDate: planExpiryDate ? new Date(planExpiryDate).toLocaleDateString() : 'N/A',
+        packageType: freePlanUser ? freePlanUser.packageType : 'N/A', // Add packageType if exists
+        plan: 'Free', // Static, as it’s a Free Plan user
+      };
+    });
+
+    res.status(200).json({
+      message: "Properties posted by Free Plan users fetched successfully!",
+      freePlanUsers: freePlanUsers, // plan user details
+      properties: enhancedProperties, // properties with additional plan info
+    });
+    
+  } catch (error) {
+    console.error('Error fetching Free Plan user properties:', error);
+    res.status(500).json({ message: 'Error fetching Free Plan user properties.', error: error.message });
+  }
+});
+
 
 
 

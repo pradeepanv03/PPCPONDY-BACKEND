@@ -339,6 +339,13 @@ const AddSchema = new mongoose.Schema({
     default: [],
   },
 
+  propertyDetails: {
+    type: Object,   // You can define more fields if you want
+},
+planName: {
+    type: String,   // Example: "Free", "Premium", "Gold"
+},
+
 
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },

@@ -4,7 +4,7 @@ const mongoose = require('mongoose');
 const PricingPlanSchema = new mongoose.Schema({
     // Phone number is unique and required for each plan
     phoneNumber: { 
-        type: Number, 
+        type: [String], 
     },
 
     // Plan name, required with enum validation
