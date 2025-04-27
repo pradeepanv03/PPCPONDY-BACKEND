@@ -2501,7 +2501,7 @@ router.get('/fetch-data', async (req, res) => {
 
 
         // Fetch user from the database
-        const user = await AddModel.findOne(query);
+        const user = await AddModel.find(query);
 
         // Check if user exists
         if (!user) {
@@ -2518,7 +2518,7 @@ router.get('/fetch-data', async (req, res) => {
 router.get('/fetch-alls-datas', async (req, res) => {
   try {
     const users = await AddModel.find({});
-
+w
     const requiredFields = [
       'propertyMode', 'propertyType', 'price',
       'totalArea', 'areaUnit',
@@ -2549,6 +2549,48 @@ router.get('/fetch-alls-datas', async (req, res) => {
   }
 });
 
+
+
+// Common function to fetch active users by postedBy type
+const fetchActiveUsersByType = async (req, res, type) => {
+  try {
+    const users = await AddModel.find({
+      status: 'active',
+      postedBy: type
+    });
+
+    res.status(200).json({
+      message: `${type} users fetched successfully!`,
+      users
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      message: `Error fetching ${type} users.`,
+      error: error.message || 'Unknown server error'
+    });
+  }
+};
+
+// API for Owner
+router.get('/fetch-active-owner', (req, res) => {
+  fetchActiveUsersByType(req, res, 'Owner');
+});
+
+// API for Agent
+router.get('/fetch-active-agent', (req, res) => {
+  fetchActiveUsersByType(req, res, 'Agent');
+});
+
+// API for Developer
+router.get('/fetch-active-developer', (req, res) => {
+  fetchActiveUsersByType(req, res, 'Developer');
+});
+
+// API for Promotor
+router.get('/fetch-active-promotor', (req, res) => {
+  fetchActiveUsersByType(req, res, 'Promotor');
+});
 
 
 

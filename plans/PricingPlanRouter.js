@@ -3,6 +3,7 @@ const router = express.Router();
 const PricingPlans = require('../plans/PricingPlanModel');
 const AddModel = require('../AddModel');
 const NotificationUser = require('../Notification/NotificationDetailModel');
+const moment = require("moment"); // if you're using moment.js (optional but helpful)
 
 
 
@@ -182,6 +183,76 @@ router.post("/select-plan", async (req, res) => {
 });
 
 
+router.get("/selected-plans", async (req, res) => {
+    try {
+        const selectedPlans = await PricingPlans.find({ phoneNumber: { $exists: true } });
+
+        return res.status(200).json({
+            status: "success",
+            data: selectedPlans,
+        });
+    } catch (error) {
+        return res.status(500).json({
+            status: "error",
+            message: "Failed to fetch selected plans.",
+            error: error.message,
+        });
+    }
+});
+
+
+// router.get("/selected-plans", async (req, res) => {
+//     try {
+//         const selectedPlans = await UserPlans.find().populate("planId");
+
+//         return res.status(200).json({
+//             status: "success",
+//             data: selectedPlans,
+//         });
+//     } catch (error) {
+//         return res.status(500).json({
+//             status: "error",
+//             message: "Failed to fetch selected plans.",
+//             error: error.message,
+//         });
+//     }
+// });
+
+
+router.get("/all-selected-plans", async (req, res) => {
+    try {
+        // Get all pricing plans with assigned phoneNumber (i.e., selected plans)
+        const allPlans = await PricingPlans.find({ phoneNumber: { $exists: true } });
+
+        const plansWithExpiry = allPlans.map(plan => {
+            const createdAt = new Date(plan.createdAt);
+            const duration = plan.durationDays || 0;
+
+            // Calculate expiry date
+            const expiryDate = new Date(createdAt);
+            expiryDate.setDate(expiryDate.getDate() + duration);
+
+            return {
+                ...plan._doc,
+                expiryDate: expiryDate.toISOString().split("T")[0], // Format: YYYY-MM-DD
+            };
+        });
+
+        return res.status(200).json({
+            status: "success",
+            data: plansWithExpiry
+        });
+
+    } catch (error) {
+        return res.status(500).json({
+            status: "error",
+            message: "Failed to fetch plans with expiry date.",
+            error: error.message
+        });
+    }
+});
+
+
 
 router.get('/plans', async (req, res) => {
     try {
@@ -204,6 +275,28 @@ router.get('/plans', async (req, res) => {
     }
 });
 
+
+
+router.get('/plan-names', async (req, res) => {
+    try {
+        const plans = await PricingPlans.find({}, 'name'); // Fetch only the 'name' field
+
+        // Filter unique names
+        const uniqueNames = [];
+        const seenNames = new Set();
+
+        plans.forEach(plan => {
+            if (!seenNames.has(plan.name)) {
+                seenNames.add(plan.name);
+                uniqueNames.push(plan.name); // Push only the name
+            }
+        });
+
+        return res.status(200).json(uniqueNames); // Return array of names
+    } catch (error) {
+        return res.status(500).json({ message: 'Error retrieving plan names.', error: error.message });
+    }
+});
 
 
 // Get a specific plan by ID

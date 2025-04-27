@@ -42,4 +42,4 @@ router.get('/followup-list', async (req, res) => {
 });
 
 
-module.exports = router; // Export router
+module.exports = router; 

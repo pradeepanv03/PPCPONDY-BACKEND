@@ -53,7 +53,7 @@ const BuyerAssistanceSchema = new mongoose.Schema({
   },
   state: { type: String},
   
-  interestedUserPhone: { type: String }, // ✅ Store user who clicks interest
+  interestedUserPhone: { type: [String] }, // ✅ Store user who clicks interest
 
   ba_status:{
 type:String,
