@@ -635,79 +635,6 @@ router.get('/get-all-owners-and-buyers', async (req, res) => {
 
 
 
-
-// ------------------
-
-// router.post('/need-help', async (req, res) => {
-//     const { phoneNumber, ppcId } = req.body;
-  
-//     try {
-//       const property = await AddModel.findOne({ ppcId });
-  
-//       if (!property) {
-//         return res.status(404).json({ message: 'Property not found' });
-//       }
-  
-//       const isAlreadyInterested = property.helpRequests?.some(
-//         (request) => request.phoneNumber === phoneNumber
-//       );
-  
-//       if (isAlreadyInterested) {
-//         return res.status(400).json({
-//           message: "You have already requested help for this property.",
-//           status: "alreadySaved",
-//           alreadySavedNumbers: property.helpRequests.map((r) => r.phoneNumber),
-//         });
-//       }
-  
-//       const updatedProperty = await AddModel.findOneAndUpdate(
-//         { ppcId },
-//         { 
-//           $push: { helpRequests: { phoneNumber } },
-//           $set: { updatedAt: Date.now() }
-//         },
-//         { new: true }
-//       );
-  
-//       try {
-//         await NotificationUser.create({
-//           recipientPhoneNumber: updatedProperty.phoneNumber,
-//           senderPhoneNumber: phoneNumber,
-//           ppcId,
-//           message: `User ${phoneNumber} requested help for your property.`,
-//           createdAt: new Date(),
-//         });
-//       } catch (notifErr) {
-//         console.error("Notification error:", notifErr.message);
-//       }
-  
-//       return res.status(200).json({
-//         message: 'Your help request has been recorded!',
-//         status: 'needHelp',
-//         postedUserPhoneNumber: updatedProperty.phoneNumber,
-//         ownerName: updatedProperty.ownerName,
-//         propertyMode: updatedProperty.propertyMode,
-//         propertyType: updatedProperty.propertyType,
-//         price: updatedProperty.price,
-//         area: updatedProperty.area,
-//         city: updatedProperty.city,
-//         createdAt: updatedProperty.createdAt,
-//         updatedAt: updatedProperty.updatedAt,
-//         views: updatedProperty.views,
-//         status: updatedProperty.status,
-//         photos: updatedProperty.photos || [],
-//         helpRequestedUserPhoneNumbers: updatedProperty.helpRequests.map(r => r.phoneNumber)
-//       });
-  
-//     } catch (error) {
-//       return res.status(500).json({
-//         message: 'Internal Server Error',
-//         error: error.message
-//       });
-//     }
-//   });
-
-
   router.get('/total-help-request-count', async (req, res) => {
     try {
       const result = await AddModel.aggregate([
@@ -807,7 +734,6 @@ router.post('/need-help', async (req, res) => {
         createdAt: new Date()
       });
     } catch (notifErr) {
-      console.error("Notification error:", notifErr.message);
     }
 
     return res.status(200).json({
@@ -837,7 +763,6 @@ router.post('/need-help', async (req, res) => {
     if (error.name === 'ValidationError') {
       return res.status(400).json({ message: error.message });
     }
-    console.error(error);
     return res.status(500).json({
       message: 'Internal Server Error',
       error: error.message
@@ -879,7 +804,6 @@ router.get('/get-help-requests', async (req, res) => {
     });
 
   } catch (error) {
-    console.error("Error fetching help requests:", error.message);
     return res.status(500).json({
       message: 'Internal Server Error',
       error: error.message
@@ -1590,7 +1514,6 @@ router.post('/report-property', async (req, res) => {
           createdAt: new Date()
         });
       } catch (notifErr) {
-        console.error('Notif error:', notifErr);
       }
   
       // Build response
@@ -1622,7 +1545,6 @@ router.post('/report-property', async (req, res) => {
       if (error.name === 'ValidationError') {
         return res.status(400).json({ message: error.message });
       }
-      console.error(error);
       return res.status(500).json({ message: 'Internal Server Error', error: error.message });
     }
   });
@@ -1665,83 +1587,12 @@ router.post('/report-property', async (req, res) => {
       res.status(200).json({ success: true, data: formattedData });
   
     } catch (error) {
-      console.error('Error fetching reported properties:', error);
       res.status(500).json({ success: false, message: 'Internal Server Error', error: error.message });
     }
   });
   
   
 
-// router.post('/report-property', async (req, res) => {
-//     const { phoneNumber, ppcId, reportReason } = req.body;
-
-//     try {
-//         const property = await AddModel.findOne({ ppcId });
-
-//         if (!property) {
-//             return res.status(404).json({ message: 'Property not found' });
-//         }
-
-//         // Check if already reported
-//         const isAlreadyReported = property.reportProperty.some(
-//             (request) => request.phoneNumber === phoneNumber
-//         );
-
-//         if (isAlreadyReported) {
-//             return res.status(400).json({
-//                 message: "You have already reported this property.",
-//                 status: "alreadyReported",
-//                 reportedNumbers: property.reportProperty.map(req => req.phoneNumber),
-//             });
-//         }
-
-//         // Add new report entry
-//         const updatedProperty = await AddModel.findOneAndUpdate(
-//             { ppcId },
-//             {
-//                 $push: { reportProperty: { phoneNumber, reportReason, createdAt: new Date() } },
-//                 $set: { updatedAt: new Date() }
-//             },
-//             { new: true }
-//         );
-
-//         // ✅ Send Notification to Property Owner
-//         try {
-//             const reportNotification = await NotificationUser.create({
-//                 recipientPhoneNumber: updatedProperty.phoneNumber, // Owner
-//                 senderPhoneNumber: phoneNumber,                   // Reporting user
-//                 ppcId,
-//                 message: `User ${phoneNumber} reported your property.`,
-//                 createdAt: new Date()
-//             });
-//         } catch (notifErr) {
-//         }
-
-//         return res.status(200).json({
-//             message: 'Your report has been recorded!',
-//             status: 'reportProperties',
-//             postedUserPhoneNumber: updatedProperty.phoneNumber,
-//             ownerName: updatedProperty.ownerName,
-//             propertyMode: updatedProperty.propertyMode,
-//             propertyType: updatedProperty.propertyType,
-//             price: updatedProperty.price,
-//             area: updatedProperty.area,
-//             city: updatedProperty.city,
-//             createdAt: updatedProperty.createdAt,
-//             updatedAt: updatedProperty.updatedAt,
-//             views: updatedProperty.views,
-//             status: updatedProperty.status,
-//             photos: updatedProperty.photos || [],
-//             reportedNumbers: updatedProperty.reportProperty.map(req => ({
-//                 phoneNumber: req.phoneNumber,
-//                 reportReason: req.reportReason
-//             }))
-//         });
-
-//     } catch (error) {
-//         return res.status(500).json({ message: 'Internal Server Error', error: error.message });
-//     }
-// });
 
 
 router.get('/property-reports-count', async (req, res) => {
@@ -1782,7 +1633,6 @@ router.get('/property-reports-count', async (req, res) => {
         totalReportedProperties
       });
     } catch (error) {
-      console.error("Error fetching report counts:", error);
       return res.status(500).json({
         message: 'Server Error',
         error: error.message
@@ -2373,62 +2223,6 @@ router.delete('/delete-soldout/:ppcId', async (req, res) => {
 });
 
 
-// ---------------------------
-
-
-// router.post("/add-favorite", async (req, res) => {
-//     const { phoneNumber, ppcId } = req.body;
-
-//     if (!phoneNumber || !ppcId) {
-//         return res.status(400).json({ message: "Phone number and Property ID are required" });
-//     }
-
-//     try {
-//         const property = await AddModel.findOne({ ppcId });
-
-//         if (!property) {
-//             return res.status(404).json({ message: "Property not found" });
-//         }
-
-//         await property.favoriteRequests(phoneNumber);
-
-//         // ✅ Notification to owner
-//         try {
-//             await NotificationUser.create({
-//                 recipientPhoneNumber: property.phoneNumber,
-//                 senderPhoneNumber: phoneNumber,
-//                 ppcId,
-//                 message: `User ${phoneNumber} added your property to favorites.`,
-//                 createdAt: new Date()
-//             });
-//         } catch (notifErr) {
-//         }
-
-//         return res.status(200).json({
-//             message: "Property added to your favorites!",
-//             status: "favorite",
-//             postedUserPhoneNumber: property.phoneNumber,
-//             ownerName: property.ownerName,
-//             propertyMode: property.propertyMode,
-//             propertyType: property.propertyType,
-//             price: property.price,
-//             area: property.area,
-//             city: property.city,
-//             createdAt: property.createdAt,
-//             updatedAt: new Date(),
-//             photos: property.photos || [],
-//             views: property.views,
-//             favoriteRequests: property.favoriteRequests.map(fav => ({
-//                 phoneNumber: fav.phoneNumber,
-//                 favoritedAt: fav.date
-//             })),
-//             readStatus: "Unread"
-//         });
-//     } catch (error) {
-//         return res.status(500).json({ message: "Internal Server Error", error: error.message });
-//     }
-// });
-
 
 router.post("/add-favorite", async (req, res) => {
   const { phoneNumber, ppcId } = req.body;
@@ -2458,7 +2252,6 @@ router.post("/add-favorite", async (req, res) => {
               createdAt: new Date()
           });
       } catch (notifErr) {
-          console.error("Notification error:", notifErr.message);
       }
 
       return res.status(200).json({
@@ -3087,7 +2880,6 @@ router.get("/get-all-favorite-removed", async (req, res) => {
           data: favoriteRemovedData,
       });
   } catch (error) {
-      console.error("Error fetching favorite removed data:", error);
       res.status(500).json({ message: "Internal Server Error", error: error.message });
   }
 });
@@ -3120,7 +2912,6 @@ router.delete("/delete-favorite-remove/:ppcId", async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Error deleting property:", error);
     res.status(500).json({ message: "Internal Server Error", error: error.message });
   }
 });

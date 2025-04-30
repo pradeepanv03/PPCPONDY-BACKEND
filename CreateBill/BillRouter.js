@@ -12,7 +12,6 @@ router.post('/create-bill', async (req, res) => {
 
     res.status(201).json({ success: true, message: 'Bill created successfully', data: newBill });
   } catch (error) {
-    console.error('Error creating bill:', error);
     res.status(500).json({ success: false, message: 'Server Error', error: error.message });
   }
 });
@@ -53,7 +52,6 @@ router.get('/get-default-bill-data', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error getting default bill data:', error);
     res.status(500).json({ success: false, message: 'Server Error', error: error.message });
   }
 });
@@ -65,7 +63,6 @@ router.get('/bills', async (req, res) => {
     const bills = await Bill.find().sort({ createdAt: -1 });
     res.status(200).json({ success: true, data: bills });
   } catch (error) {
-    console.error('Error fetching bills:', error);
     res.status(500).json({ success: false, message: 'Server Error', error: error.message });
   }
 });
@@ -79,7 +76,6 @@ router.get('/bill/:id', async (req, res) => {
     }
     res.status(200).json({ success: true, data: bill });
   } catch (error) {
-    console.error('Error fetching bill:', error);
     res.status(500).json({ success: false, message: 'Server Error', error: error.message });
   }
 });

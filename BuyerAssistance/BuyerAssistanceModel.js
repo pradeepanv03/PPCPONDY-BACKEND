@@ -3,7 +3,8 @@ const mongoose = require("mongoose");
 
 
 const BuyerAssistanceSchema = new mongoose.Schema({
-  ba_id: { type: Number },  // Unique BA ID per user
+  ba_id: { type: Number, required: true, unique: true 
+   },  // Unique BA ID per user
   baName:{
     type:String
   },
@@ -36,18 +37,22 @@ const BuyerAssistanceSchema = new mongoose.Schema({
     type:String,
   },
   propertyMode: {
-    type:String,
-    
+    type:String,  
   },
+
   propertyType:{
     type:String,
     required: true
   },
+
   propertyAge:{
     type:String,
   },
+
   bankLoan: { type: String, }, 
+
   propertyApproved: { type: String,  }, 
+  
   facing: {
     type:String,
   },

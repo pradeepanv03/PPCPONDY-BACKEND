@@ -3,8 +3,17 @@ const mongoose = require('mongoose');
 // Define the plan schema
 const PricingPlanSchema = new mongoose.Schema({
     // Phone number is unique and required for each plan
-    phoneNumber: { 
-        type: [String], 
+    // phoneNumber: { 
+    //     type: [String], 
+    // },
+    phoneNumber: {
+        type: [String], // Array of strings
+        validate: {
+            validator: function (array) {
+                return array.every(phone => /^[0-9]{10}$/.test(phone)); // Validates 10-digit phone numbers
+            },
+            message: 'Each phone number must be a valid 10-digit number!'
+        }
     },
 
     // Plan name, required with enum validation
@@ -67,6 +76,9 @@ const PricingPlanSchema = new mongoose.Schema({
         type: Date,
         default: Date.now,
     },
+
+    expireDate: { type: Date },
+
 });
 
 const PricingPlans = mongoose.model('PricingPlans', PricingPlanSchema);

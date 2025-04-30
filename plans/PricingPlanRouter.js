@@ -13,7 +13,6 @@ const normalizePhoneNumber = (phoneNumber) => {
     return phoneNumber.replace(/^\+?91/, ""); // Convert +91XXXXXX or 91XXXXXX to XXXXXX
 };
 
-// ✅ Get all plans for a specific phone number
 router.get("/plans/:phoneNumber", async (req, res) => {
     try {
         let { phoneNumber } = req.params;
@@ -24,11 +23,19 @@ router.get("/plans/:phoneNumber", async (req, res) => {
             return res.status(404).json({ message: "No plans found for this phone number." });
         }
 
-        return res.status(200).json({ success: true, plans });
+        return res.status(200).json({ 
+            success: true, 
+            plans: plans.map(plan => ({
+                ...plan.toObject(),
+                createdDate: plan.createdAt ? moment(plan.createdAt).format('YYYY-MM-DD') : null,
+                expireDate: plan.expireDate ? moment(plan.expireDate).format('YYYY-MM-DD') : null
+            }))
+        });
     } catch (error) {
         return res.status(500).json({ message: "Error fetching plans.", error: error.message });
     }
 });
+
 
 
 
@@ -131,16 +138,6 @@ router.post("/select-plan", async (req, res) => {
     const { phoneNumber, planId } = req.body;
 
     try {
-        // Check if the user already has an active plan
-        const existingPlan = await PricingPlans.findOne({ phoneNumber });
-
-        if (existingPlan) {
-            return res.status(400).json({
-                status: "error",
-                message: "You already have an active plan!",
-            });
-        }
-
         // Find the plan by ID
         const selectedPlan = await PricingPlans.findById(planId);
 
@@ -151,28 +148,42 @@ router.post("/select-plan", async (req, res) => {
             });
         }
 
-        // Assign the plan to the user
-        selectedPlan.phoneNumber = phoneNumber;
+        // Add phone number to the plan's phoneNumber array
+        if (!selectedPlan.phoneNumber.includes(phoneNumber)) {
+            selectedPlan.phoneNumber.push(phoneNumber);
+        } else {
+            return res.status(400).json({
+                status: "error",
+                message: "Phone number is already associated with this plan!",
+            });
+        }
+
+        // Update createdAt and expireDate
+        selectedPlan.createdAt = new Date();
+        selectedPlan.expireDate = moment(selectedPlan.createdAt)
+            .add(selectedPlan.durationDays, 'days')
+            .toDate();
+
         await selectedPlan.save();
 
-        // ✅ Save notification (Plan Selection Notification)
+        // Send notification
         try {
-
-            const notification = await NotificationUser.create({
+            await NotificationUser.create({
                 recipientPhoneNumber: phoneNumber,
                 senderPhoneNumber: phoneNumber,
                 ppcId: "PLAN-" + planId,
                 message: `A new plan has been selected by ${phoneNumber}.`,
                 createdAt: new Date()
             });
-
         } catch (notifErr) {
         }
 
         return res.status(200).json({
             status: "success",
-            message: "Plan selected successfully!",
+            message: "Phone number added successfully to the plan!",
             selectedPlan,
+            createdDate: moment(selectedPlan.createdAt).format('YYYY-MM-DD'),
+            expireDate: moment(selectedPlan.expireDate).format('YYYY-MM-DD')
         });
 
     } catch (error) {
@@ -202,23 +213,6 @@ router.get("/selected-plans", async (req, res) => {
     }
 });
 
-
-// router.get("/selected-plans", async (req, res) => {
-//     try {
-//         const selectedPlans = await UserPlans.find().populate("planId");
-
-//         return res.status(200).json({
-//             status: "success",
-//             data: selectedPlans,
-//         });
-//     } catch (error) {
-//         return res.status(500).json({
-//             status: "error",
-//             message: "Failed to fetch selected plans.",
-//             error: error.message,
-//         });
-//     }
-// });
 
 
 router.get("/all-selected-plans", async (req, res) => {

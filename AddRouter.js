@@ -50,6 +50,238 @@ const upload = multer({
 });
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+router.get('/fetch-all-datas', async (req, res) => {
+  try {
+
+      // Fetch all users from the database
+      const users = await AddModel.find({});
+
+      // Return the fetched user data
+      res.status(200).json({ message: 'All user data fetched successfully!', users });
+  } catch (error) {
+      res.status(500).json({ message: 'Error fetching all user details.', error });
+  }
+});
+
+
+
+router.get("/fetch-featured-properties", async (req, res) => {
+  try {
+    const featuredProperties = await AddModel.find({ featureStatus: "yes" });
+
+    res.status(200).json({
+      message: "Featured properties fetched successfully!",
+      properties: featuredProperties,
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching featured properties.", error });
+  }
+});
+
+
+
+// Route to get all property data
+router.get('/properties', async (req, res) => {
+  try {
+    const properties = await AddModel.find(); // Get all properties
+    res.status(200).json(properties); // Return the properties as JSON
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to retrieve properties', message: err.message });
+  }
+});
+
+
+
+
+router.get('/uploads-count', async (req, res) => {
+  const { ppcId } = req.query; // Use query params to pass ppcId
+
+  // Ensure `ppcId` is provided
+  if (!ppcId) {
+    return res.status(400).json({ message: 'Property ID (ppcId) is required' });
+  }
+
+  try {
+    // Find the property by `ppcId`
+    const property = await AddModel.findOne({ ppcId });
+
+    if (!property) {
+      return res.status(404).json({ message: 'Property not found' });
+    }
+
+    // Count the number of uploaded images
+    const uploadedImagesCount = property.photos ? property.photos.length : 0;
+
+    return res.status(200).json({
+      message: 'Uploaded images count retrieved successfully',
+      uploadedImagesCount,
+      uploadedImages: property.photos || [], // Return the array of uploaded image filenames
+    });
+  } catch (error) {
+    return res.status(500).json({ message: 'Internal Server Error', error: error.message });
+  }
+});
+
+
+router.get("/property/:ppcId", async (req, res) => {
+  try {
+    const { ppcId } = req.params;
+    const property = await AddModel.findOne({ ppcId });
+
+    if (!property) {
+      return res.status(404).json({ message: "Property not found" });
+    }
+
+    res.status(200).json(property);
+  } catch (error) {
+    res.status(500).json({ message: "Internal Server Error", error: error.message });
+  }
+});
+
+
+
+
+router.get('/fetch-data', async (req, res) => {
+  const { phoneNumber, ppcId } = req.query;
+
+  // Ensure at least one parameter is provided
+  if (!phoneNumber && !ppcId) {
+      return res.status(400).json({ message: 'Either phone number or PPC-ID is required.' });
+  }
+
+  try {
+
+      // Normalize phone number (remove spaces, dashes, country code, and ensure consistency)
+      const normalizedPhoneNumber = phoneNumber
+          ? phoneNumber.replace(/[\s-]/g, '').replace(/^(\+91|91|0)/, '').trim() // Remove country code, spaces, dashes
+          : null;
+
+      // Build query dynamically based on the provided parameters
+      const query = {};
+      if (normalizedPhoneNumber) query.phoneNumber = new RegExp(normalizedPhoneNumber + '$'); // Match phone number ending with the query
+      if (ppcId) query.ppcId = ppcId;
+
+
+      // Fetch user from the database
+      const user = await AddModel.findOne(query);
+
+      // Check if user exists
+      if (!user) {
+          return res.status(404).json({ message: 'User not found.' });
+      }
+
+      res.status(200).json({ message: 'User data fetched successfully!', user });
+  } catch (error) {
+      res.status(500).json({ message: 'Error fetching user details.', error });
+  }
+});
+
+
+
+
+// ✅ API to fetch viewed properties for a user
+router.get("/user-viewed-properties", async (req, res) => {
+  try {
+    const { phoneNumber } = req.query;
+
+    if (!phoneNumber) {
+      return res.status(400).json({ message: "phoneNumber is required" });
+    }
+
+    // Normalize phone number (remove spaces and '+')
+    const normalizedPhoneNumber = phoneNumber.replace(/\s+/g, "").replace(/\+/g, "");
+
+    // Fetch the user's viewed properties
+    const userViews = await UserViewsModel.findOne({ phoneNumber: normalizedPhoneNumber });
+
+    if (!userViews || userViews.viewedProperties.length === 0) {
+      return res.status(404).json({ message: "No viewed properties found" });
+    }
+
+    res.status(200).json({ viewedProperties: userViews.viewedProperties });
+  } catch (error) {
+    res.status(500).json({ message: "Internal Server Error", error: error.message });
+  }
+});
+
+
+router.post("/user-viewed-property", async (req, res) => {
+  try {
+    const { phoneNumber, ppcId } = req.body;
+
+    if (!phoneNumber || !ppcId) {
+      return res.status(400).json({ message: "phoneNumber and ppcId are required" });
+    }
+
+    // Normalize phone number
+    const normalizedPhoneNumber = phoneNumber.replace(/\s+/g, "").replace(/\+/g, "");
+
+    // Check if the property exists
+    const property = await AddModel.findOne({ ppcId });
+    if (!property) {
+      return res.status(404).json({ message: "Property not found" });
+    }
+
+    const propertyOwnerPhoneNumber = property.phoneNumber;
+
+    // ✅ Step 1: Record the view in UserViews
+    let userViews = await UserViewsModel.findOne({ phoneNumber: normalizedPhoneNumber });
+
+    if (!userViews) {
+      userViews = new UserViewsModel({
+        phoneNumber: normalizedPhoneNumber,
+        viewedProperties: [
+          { ppcId, propertyOwnerPhoneNumber, viewedAt: new Date() },
+        ],
+      });
+    } else {
+      const alreadyViewed = userViews.viewedProperties.some((view) => view.ppcId === ppcId);
+      if (!alreadyViewed) {
+        userViews.viewedProperties.push({
+          ppcId,
+          propertyOwnerPhoneNumber,
+          viewedAt: new Date(),
+        });
+      }
+    }
+
+    await userViews.save();
+
+    // ✅ Step 2: Increment views in AddModel
+    await AddModel.updateOne({ ppcId }, { $inc: { views: 1 } });
+
+    // ✅ Step 3: Create a notification to the property owner
+    await NotificationUser.create({
+      recipientPhoneNumber: propertyOwnerPhoneNumber,
+      senderPhoneNumber: normalizedPhoneNumber,
+      message: `Your property (ID: ${ppcId}) was viewed by a user.`,
+      ppcId: ppcId,
+      createdAt: new Date(),
+    });
+
+    res.status(200).json({ message: "Property view recorded and notification sent" });
+  } catch (error) {
+    res.status(500).json({ message: "Internal Server Error", error: error.message });
+  }
+});
+
+  
+
+
+
 // // Fixed version
 // router.get('/user-lead-stats', async (req, res) => {
 //   try {
@@ -505,13 +737,6 @@ router.get("/user-viewed-properties", async (req, res) => {
       (a, b) => new Date(b.viewedAt) - new Date(a.viewedAt)
     );
 
-    // // Optional: fetch notifications for viewed properties
-    // const viewedPpcIds = sortedViews.map(view => view.ppcId);
-    // const relatedNotifications = await NotificationUser.find({
-    //   senderPhoneNumber: normalizedPhoneNumber,
-    //   ppcId: { $in: viewedPpcIds }
-    // }).sort({ createdAt: -1 });
-
     res.status(200).json({
       viewedProperties: sortedViews,
       // notifications: relatedNotifications
@@ -524,62 +749,6 @@ router.get("/user-viewed-properties", async (req, res) => {
 
 
 
-
-router.post("/user-viewed-property", async (req, res) => {
-  try {
-    const { phoneNumber, ppcId } = req.body;
-
-    if (!phoneNumber || !ppcId) {
-      return res.status(400).json({ message: "phoneNumber and ppcId are required" });
-    }
-
-    const normalizedPhoneNumber = phoneNumber.replace(/\s+/g, "").replace(/\+/g, "");
-
-    const property = await AddModel.findOne({ ppcId });
-    if (!property) {
-      return res.status(404).json({ message: "Property not found" });
-    }
-
-    const propertyOwnerPhoneNumber = property.phoneNumber;
-
-    let userViews = await UserViewsModel.findOne({ phoneNumber: normalizedPhoneNumber });
-
-    const newViewEntry = {
-      ppcId,
-      viewerPhoneNumber: normalizedPhoneNumber,
-      propertyOwnerPhoneNumber,
-      viewedAt: new Date(),
-    };
-
-    if (!userViews) {
-      userViews = new UserViewsModel({
-        phoneNumber: normalizedPhoneNumber,
-        viewedProperties: [newViewEntry],
-      });
-    } else {
-      const alreadyViewed = userViews.viewedProperties.some(view => view.ppcId === ppcId);
-      if (!alreadyViewed) {
-        userViews.viewedProperties.push(newViewEntry);
-      }
-    }
-
-    await userViews.save();
-
-    await AddModel.updateOne({ ppcId }, { $inc: { views: 1 } });
-
-    await NotificationUser.create({
-      recipientPhoneNumber: propertyOwnerPhoneNumber,
-      senderPhoneNumber: normalizedPhoneNumber,
-      message: `Your property (ID: ${ppcId}) was viewed by a user.`,
-      ppcId: ppcId,
-      createdAt: new Date(),
-    });
-
-    res.status(200).json({ message: "Property view recorded and notification sent" });
-  } catch (error) {
-    res.status(500).json({ message: "Internal Server Error", error: error.message });
-  }
-});
 
 
 
@@ -826,217 +995,6 @@ router.get("/property-buyer-viewed", async (req, res) => {
 
 
 
-// router.post(
-//   '/update-property',
-//   upload.fields([{ name: 'video', maxCount: 1 }, { name: 'photos', maxCount: 15 }]),
-//   async (req, res) => {
-//     if (req.fileValidationError) {
-//       return res.status(400).json({ message: req.fileValidationError });
-//     }
-//     if (req.files['video'] && req.files['video'][0].size > 50 * 1024 * 1024) {
-//       return res.status(400).json({ message: 'Video file size exceeds 50MB.' });
-//     }
-
-//     const {
-//       ppcId,
-//       phoneNumber,
-//       price,
-//       rentalPropertyAddress,
-//       state,
-//       city,
-//       district,
-//       area,
-//       streetName,
-//       doorNumber,
-//       nagar,
-//       ownerName,
-//       email,
-//       alternatePhone,
-//       countryCode,
-//       alternateCountryCode,
-//       propertyMode,
-//       propertyType,
-//       bankLoan,
-//       negotiation,
-//       ownership,
-//       bedrooms,
-//       kitchen,
-//       kitchenType,
-//       balconies,
-//       floorNo,
-//       areaUnit,
-//       propertyApproved,
-//       propertyAge,
-//       postedBy,
-//       facing,
-//       salesMode,
-//       salesType,
-//       furnished,
-//       lift,
-//       attachedBathrooms,
-//       western,
-//       numberOfFloors,
-//       carParking,
-//       bestTimeToCall,
-//       totalArea,
-//       length,
-//       breadth,
-//     } = req.body;
-
-//     if (!ppcId) {
-//       return res.status(400).json({ message: 'PPC-ID is required.' });
-//     }
-
-//     try {
-//       const user = await AddModel.findOne({ ppcId });
-//       if (!user) {
-//         return res.status(404).json({ message: 'User not found.' });
-//       }
-
-//       // Update fields dynamically
-//       const fieldsToUpdate = {
-//         phoneNumber, price, rentalPropertyAddress, state, city, district, area, 
-//         streetName, doorNumber, nagar, ownerName, email, alternatePhone, countryCode, 
-//         alternateCountryCode, propertyMode, propertyType, bankLoan, negotiation, ownership, 
-//         bedrooms, kitchen, kitchenType, balconies, floorNo, areaUnit, propertyApproved, 
-//         propertyAge, postedBy, facing, salesMode, salesType, furnished, lift, 
-//         attachedBathrooms, western, numberOfFloors, carParking, bestTimeToCall, totalArea,
-//         length, breadth,
-//       };
-
-//       for (const key in fieldsToUpdate) {
-//         if (fieldsToUpdate[key]) {
-//           user[key] = fieldsToUpdate[key];
-//         }
-//       }
-
-//       // Handle file uploads
-//       if (req.files) {
-//         if (req.files['video']) {
-//           user.video = req.files['video'][0].path;
-//         }
-//         if (req.files['photos']) {
-//           user.photos = req.files['photos'].map((file) => file.path);
-//         }
-//       }
-
-//       // Required fields to check for "complete" status
-//       const requiredFields = [
-//         'ppcId',
-//         'phoneNumber',
-//         'price',
-//         'propertyMode',
-//         'propertyType',
-//         'areaUnit',
-//         'salesType',
-//         'totalArea',
-//         'postedBy',
-//       ];
-      
-
-//       const isComplete = requiredFields.every((field) => user[field]);
-//       user.status = isComplete ? 'complete' : 'incomplete';
-
-//       await user.save();
-
-//       // Save notification
-//       try {
-//         await NotificationUser.create({
-//           recipientPhoneNumber: user.phoneNumber,
-//           senderPhoneNumber: user.phoneNumber,
-//           userPhoneNumber: user.phoneNumber,
-//           ppcId: user.ppcId,
-//           type: 'property-Add',
-//           message: `Your property (${user.ppcId}) has been Added successfully.`,
-//           createdAt: new Date(),
-//         });
-//       } catch (notifErr) {
-//         console.error('Notification creation failed:', notifErr.message);
-//       }
-
-//       res.status(200).json({
-//         message: 'Property details updated successfully!',
-//         ppcId: user.ppcId,
-//         propertyStatus: user.status,
-//         user,
-//       });
-//     } catch (error) {
-//       res.status(500).json({ message: 'Error updating property details.', error });
-//     }
-//   }
-// );
-
-
-
-// router.get('/fetch-all-datas', async (req, res) => {
-//   try {
-//     const requiredFields = [
-//       'ppcId',
-//       'phoneNumber',
-//       'price',
-//       'propertyMode',
-//       'propertyType',
-//       // 'areaUnit',
-//       // 'salesType',
-//       // 'totalArea',
-//       // 'postedBy'
-//     ];
-
-//     // Build query to ensure all required fields are present and not empty
-//     const query = {
-//       $and: requiredFields.map(field => ({
-//         [field]: { $exists: true, $ne: null, $ne: '' }
-//       }))
-//     };
-
-//     const users = await AddModel.find(query);
-
-//     res.status(200).json({
-//       message: 'Filtered user data with all required fields fetched successfully!',
-//       users
-//     });
-//   } catch (error) {
-//     res.status(500).json({
-//       message: 'Error fetching user data with required fields.',
-//       error: error.message
-//     });
-//   }
-// });
-
-
-// router.get('/fetch-all-datas', async (req, res) => {
-//   try {
-//     const requiredFields = [
-//       'ppcId',
-//       'phoneNumber',
-//       'price',
-//       'propertyMode',
-//       'propertyType',
-//     ];
-
-//     const query = {
-//       $and: requiredFields.map(field => ({
-//         [field]: { $exists: true, $ne: null, $ne: '' }
-//       }))
-//     };
-
-//     const users = await AddModel.find(query);
-
-//     const total = await AddModel.countDocuments();
-//     const matching = users.length;
-
-//     res.status(200).json({
-//       message: `Filtered user data fetched: ${matching} of ${total} matched.`,
-//       users
-//     });
-//   } catch (error) {
-//     res.status(500).json({
-//       message: 'Error fetching user data.',
-//       error: error.message
-//     });
-//   }
-// });
-
 
 router.post(
   '/update-property',
@@ -1134,13 +1092,6 @@ router.post(
         }
       }
 
-      // // Check if all required fields are filled
-      // const requiredFields = [
-      //   'ppcId','phoneNumber', 'price',     'propertyMode',
-      //   'propertyType',  
-       
-      // ];
-
 
       const requiredFields = [
         'phoneNumber', 'price', 'rentalPropertyAddress', 'state', 'city',
@@ -1188,24 +1139,6 @@ try {
 
 
 
-
-// router.get('/fetch-property-dropdowns', async (req, res) => {
-//   try {
-//     const [ propertyTypes] = await Promise.all([
-//       AddModel.distinct('propertyType', { propertyType: { $ne: null } })
-//     ]);
-
-//     res.status(200).json({
-//       message: 'Property dropdown values fetched successfully',
-//       propertyModes,
-//     });
-//   } catch (error) {
-//     res.status(500).json({
-//       message: 'Error fetching dropdown values',
-//       error: error.message,
-//     });
-//   }
-// });
 
 
 
@@ -1310,7 +1243,6 @@ router.get("/pending-properties-count", async (req, res) => {
 
     res.status(200).json({ pendingProperties: count });
   } catch (error) {
-    console.error("Error counting pending properties:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
@@ -1891,48 +1823,6 @@ router.delete('/delete-viewed-property/:ppcId', async (req, res) => {
 });
 
 
-// Route to get all property data
-router.get('/properties', async (req, res) => {
-  try {
-    const properties = await AddModel.find(); // Get all properties
-    res.status(200).json(properties); // Return the properties as JSON
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to retrieve properties', message: err.message });
-  }
-});
-
-
-
-router.get('/uploads-count', async (req, res) => {
-  const { ppcId } = req.query; // Use query params to pass ppcId
-
-  // Ensure `ppcId` is provided
-  if (!ppcId) {
-    return res.status(400).json({ message: 'Property ID (ppcId) is required' });
-  }
-
-  try {
-    // Find the property by `ppcId`
-    const property = await AddModel.findOne({ ppcId });
-
-    if (!property) {
-      return res.status(404).json({ message: 'Property not found' });
-    }
-
-    // Count the number of uploaded images
-    const uploadedImagesCount = property.photos ? property.photos.length : 0;
-
-    return res.status(200).json({
-      message: 'Uploaded images count retrieved successfully',
-      uploadedImagesCount,
-      uploadedImages: property.photos || [], // Return the array of uploaded image filenames
-    });
-  } catch (error) {
-    return res.status(500).json({ message: 'Internal Server Error', error: error.message });
-  }
-});
-
-
 router.get('/latest-ppcid', async (req, res) => {
     try {
         const latestProperty = await AddModel.findOne().sort({ ppcId: -1 });
@@ -1942,22 +1832,6 @@ router.get('/latest-ppcid', async (req, res) => {
     }
 });
 
-
-// router.post("/store-id", async (req, res) => {
-//   try {
-
-//     const latestProperty = await AddModel.findOne().sort({ ppcId: -1 });
-
-//     const nextPpcId = latestProperty ? latestProperty.ppcId + 1 : 1001;
-
-//     const newUser = new AddModel({ ppcId: nextPpcId });
-//     const savedUser = await newUser.save();
-
-//     res.status(201).json({ message: "PPC-ID created and stored successfully!", ppcId: nextPpcId });
-//   } catch (error) {
-//     res.status(500).json({ message: "Error storing PPC-ID.", error });
-//   }
-// });
 
 
 router.post("/store-id", async (req, res) => {
@@ -2108,27 +1982,6 @@ router.delete('/delete-viewed-property/:ppcId', async (req, res) => {
 });
 
 
-
-// // Store new user data without PPC-ID
-// router.post('/store-phone', async (req, res) => {
-//     const { phoneNumber } = req.body;
-  
-//     if (!phoneNumber) {
-//       return res.status(400).json({ message: 'Phone number is required.' });
-//     }
-  
-//     try {
-  
-//       // Create new user with the provided phone number
-//       const newUser = new AddModel({ phoneNumber });
-//       await newUser.save();
-  
-//       res.status(201).json({ message: 'User added successfully!' });
-//     } catch (error) {
-//       res.status(500).json({ message: 'Error storing user details.', error });
-//     }
-//   });
-  
 
 
   router.post('/store-data', async (req, res) => {
@@ -2478,78 +2331,6 @@ router.get('/edit-property/:ppcId', async (req, res) => {
 
 
 
-
-router.get('/fetch-data', async (req, res) => {
-    const { phoneNumber, ppcId } = req.query;
-
-    // Ensure at least one parameter is provided
-    if (!phoneNumber && !ppcId) {
-        return res.status(400).json({ message: 'Either phone number or PPC-ID is required.' });
-    }
-
-    try {
-
-        // Normalize phone number (remove spaces, dashes, country code, and ensure consistency)
-        const normalizedPhoneNumber = phoneNumber
-            ? phoneNumber.replace(/[\s-]/g, '').replace(/^(\+91|91|0)/, '').trim() // Remove country code, spaces, dashes
-            : null;
-
-        // Build query dynamically based on the provided parameters
-        const query = {};
-        if (normalizedPhoneNumber) query.phoneNumber = new RegExp(normalizedPhoneNumber + '$'); // Match phone number ending with the query
-        if (ppcId) query.ppcId = ppcId;
-
-
-        // Fetch user from the database
-        const user = await AddModel.find(query);
-
-        // Check if user exists
-        if (!user) {
-            return res.status(404).json({ message: 'User not found.' });
-        }
-
-        res.status(200).json({ message: 'User data fetched successfully!', user });
-    } catch (error) {
-        res.status(500).json({ message: 'Error fetching user details.', error });
-    }
-});
-
-
-// router.get('/fetch-alls-datas', async (req, res) => {
-//   try {
-//     const users = await AddModel.find({});
-// w
-//     const requiredFields = [
-//       'propertyMode', 'propertyType', 'price',
-//       'totalArea', 'areaUnit',
-//       'salesType', 'postedBy'
-//     ];
-
-//     const processedUsers = users.map((user) => {
-//       // Check if all required fields are non-empty and not null/undefined
-//       const isComplete = requiredFields.every(
-//         (field) =>
-//           user[field] !== undefined &&
-//           user[field] !== null &&
-//           String(user[field]).trim() !== ''
-//       );
-
-//       return {
-//         ...user._doc,
-//         required: isComplete ? "yes" : "no",
-//       };
-//     });
-
-//     res.status(200).json({
-//       message: "All user data fetched successfully!",
-//       users: processedUsers
-//     });
-//   } catch (error) {
-//     res.status(500).json({ message: 'Error fetching all user details.', error });
-//   }
-// });
-
-
 router.get('/fetch-alls-datas', async (req, res) => {
   try {
     const users = await AddModel.find({});
@@ -2579,7 +2360,6 @@ router.get('/fetch-alls-datas', async (req, res) => {
       users: processedUsers
     });
   } catch (error) {
-    console.error('Error fetching all user details:', error); // add console for debugging
     res.status(500).json({ message: 'Error fetching all user details.', error: error.message });
   }
 });
@@ -2630,35 +2410,6 @@ router.get('/fetch-active-promotor', (req, res) => {
 
 
 
-
-// router.get('/fetch-free-plan-properties', async (req, res) => {
-//   try {
-//     // 1. Find all users who have Free Plan
-//     const freePlanUsers = await PricingPlans.find({ name: "Free" });
-
-//     if (!freePlanUsers.length) {
-//       return res.status(404).json({ message: 'No users found with Free Plan.' });
-//     }
-
-//     // 2. Extract phoneNumbers from Free Plan users (assuming phoneNumbers is an array)
-//     const phoneNumbers = freePlanUsers.flatMap(user => user.phoneNumber); // Flattening in case of an array
-
-//     // 3. Find properties posted by these phoneNumbers
-//     const properties = await AddModel.find({ phoneNumber: { $in: phoneNumbers } });
-
-//     res.status(200).json({
-//       message: "Properties posted by Free Plan users fetched successfully!",
-//       freePlanUsers: freePlanUsers, // plan user details
-//       properties: properties         // their posted properties
-//     });
-
-//   } catch (error) {
-//     console.error('Error fetching Free Plan user properties:', error);
-//     res.status(500).json({ message: 'Error fetching Free Plan user properties.', error: error.message });
-//   }
-// });
-
-
 router.get('/fetch-free-plan-properties', async (req, res) => {
   try {
     // 1. Find all users who have Free Plan
@@ -2703,11 +2454,197 @@ router.get('/fetch-free-plan-properties', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Error fetching Free Plan user properties:', error);
     res.status(500).json({ message: 'Error fetching Free Plan user properties.', error: error.message });
   }
 });
 
+
+
+router.get('/fetch-plan-by-phone-number', async (req, res) => {
+  try {
+    const { phoneNumber } = req.query; // Extract phoneNumber from the query parameter
+
+    // Validate if phoneNumber is provided
+    if (!phoneNumber) {
+      return res.status(400).json({ message: 'Phone number is required.' });
+    }
+
+    // 1. Fetch the user with the given phone number
+    const user = await PricingPlans.findOne({ phoneNumber });
+
+    // Handle case where no user is found
+    if (!user) {
+      return res.status(404).json({ message: 'No user found with the given phone number.' });
+    }
+
+    // Extract user plan details
+    const { name: planName, createdAt, durationDays, packageType } = user;
+
+    // Calculate plan expiry date
+    const planExpiryDate = createdAt && durationDays
+      ? new Date(new Date(createdAt).getTime() + durationDays * 24 * 60 * 60 * 1000) // Adds durationDays in milliseconds
+      : null;
+
+    // Format the expiry date for display
+    const formattedExpiryDate = planExpiryDate ? new Date(planExpiryDate).toLocaleDateString() : 'N/A';
+
+    // Format the createdAt date for display
+    const formattedCreatedAt = createdAt ? new Date(createdAt).toLocaleDateString() : 'N/A';
+
+    // 2. Fetch properties posted by the user
+    const properties = await AddModel.find({ phoneNumber });
+
+    // Map properties to include plan information
+    const enhancedProperties = properties.map((property) => ({
+      ...property.toObject(),
+      planName,
+      planCreatedAt: formattedCreatedAt, // Display formatted createdAt date
+      durationDays,
+      planExpiryDate: formattedExpiryDate,
+      packageType: packageType || 'N/A',
+    }));
+
+    // Send success response
+    res.status(200).json({
+      message: "Plan details and associated properties fetched successfully!",
+      user: {
+        planName,
+        planCreatedAt: formattedCreatedAt, // Display formatted createdAt date
+        durationDays,
+        packageType,
+        planExpiryDate: formattedExpiryDate, // Display formatted expiry date
+      },
+      properties: enhancedProperties,
+    });
+  } catch (error) {
+
+    // Handle server errors
+    res.status(500).json({
+      message: 'Error fetching plan details.',
+      error: error.message,
+    });
+  }
+});
+
+
+
+router.get('/fetch-all-plans-and-properties', async (req, res) => {
+  try {
+    const users = await PricingPlans.find();
+
+    if (!users.length) {
+      return res.status(404).json({ message: 'No users found.' });
+    }
+
+    const userPlansWithProperties = await Promise.all(users.map(async (user) => {
+      const { name: planName, phoneNumber, createdAt, durationDays, packageType } = user;
+
+      const planExpiryDate = createdAt && durationDays
+        ? new Date(new Date(createdAt).getTime() + durationDays * 24 * 60 * 60 * 1000)
+        : null;
+
+      const formattedCreatedAt = createdAt ? new Date(createdAt).toLocaleDateString() : 'N/A';
+      const formattedExpiryDate = planExpiryDate ? new Date(planExpiryDate).toLocaleDateString() : 'N/A';
+
+      // Fetch only active properties associated with this user's phone number(s)
+      const properties = await AddModel.find({
+        phoneNumber: { $in: phoneNumber },
+        status: 'active'
+      });
+      
+      const enhancedProperties = properties.map((property) => ({
+        ...property.toObject(),
+        planName,
+        planCreatedAt: formattedCreatedAt,
+        durationDays,
+        planExpiryDate: formattedExpiryDate,
+        packageType: packageType || 'N/A',
+      }));
+
+      return {
+        user: {
+          phoneNumber,
+          planName,
+          planCreatedAt: formattedCreatedAt,
+          durationDays,
+          planExpiryDate: formattedExpiryDate,
+          packageType,
+        },
+        properties: enhancedProperties,
+      };
+    }));
+
+    res.status(200).json({
+      message: "Active properties and user plans fetched successfully!",
+      data: userPlansWithProperties,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: 'Error fetching all plans and properties.',
+      error: error.message,
+    });
+  }
+});
+
+
+
+router.get('/fetch-all-free-plans', async (req, res) => {
+  try {
+    const users = await PricingPlans.find({ name: 'Free' }); // Fetch only Free plans
+
+    if (!users.length) {
+      return res.status(404).json({ message: 'No users with Free plan found.' });
+    }
+
+    const userPlansWithProperties = await Promise.all(users.map(async (user) => {
+      const { name: planName, phoneNumber, createdAt, durationDays, packageType } = user;
+
+      const planExpiryDate = createdAt && durationDays
+        ? new Date(new Date(createdAt).getTime() + durationDays * 24 * 60 * 60 * 1000)
+        : null;
+
+      const formattedCreatedAt = createdAt ? new Date(createdAt).toLocaleDateString() : 'N/A';
+      const formattedExpiryDate = planExpiryDate ? new Date(planExpiryDate).toLocaleDateString() : 'N/A';
+
+      // Fetch only active properties associated with this user's phone number(s)
+      const properties = await AddModel.find({
+        phoneNumber: { $in: phoneNumber },
+        status: 'active'
+      });
+
+      const enhancedProperties = properties.map((property) => ({
+        ...property.toObject(),
+        planName,
+        planCreatedAt: formattedCreatedAt,
+        durationDays,
+        planExpiryDate: formattedExpiryDate,
+        packageType: packageType || 'N/A',
+      }));
+
+      return {
+        user: {
+          phoneNumber,
+          planName,
+          planCreatedAt: formattedCreatedAt,
+          durationDays,
+          planExpiryDate: formattedExpiryDate,
+          packageType,
+        },
+        properties: enhancedProperties,
+      };
+    }));
+
+    res.status(200).json({
+      message: "Free plan's active properties and user plans fetched successfully!",
+      data: userPlansWithProperties,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: 'Error fetching Free plans and properties.',
+      error: error.message,
+    });
+  }
+});
 
 
 
@@ -2727,28 +2664,6 @@ router.get('/fetch-all-datas', async (req, res) => {
 
 
 
-// // router.get('/fetch-all-datas', async (req, res) => {
-//   try {
-//     // Delete all "incomplete" entries from DB
-//     await AddModel.deleteMany({ status: 'incomplete' });
-
-//     // Fetch only "complete" entries
-//     const users = await AddModel.find({ status: 'complete' });
-
-//     res.status(200).json({
-//       message: 'Only complete user data fetched successfully!',
-//       users
-//     });
-//   } catch (error) {
-//     res.status(500).json({
-//       message: 'Error fetching user data.',
-//       error
-//     });
-//   }
-// });
-
-
-// API to fetch distinct states from AddModel
 router.get("/fetch-states", async (req, res) => {
   try {
     const states = await AddModel.distinct("state"); // Fetch unique state values
@@ -2775,25 +2690,6 @@ router.get("/fetch-all-properties", async (req, res) => {
   }
 });
 
-// // Fetch properties from Puducherry (Case-Insensitive)
-// router.get("/fetch-Pudhucherry-properties", async (req, res) => {
-//   try {
-//     const pondicherryData = await AddModel.find({ 
-//       state: { $regex: /^puducherry$/i }  // Case-insensitive match
-//     });
-
-//     if (pondicherryData.length === 0) {
-//       return res.status(404).json({ success: false, message: "No data found for Puducherry" });
-//     }
-
-//     res.json({ success: true, data: pondicherryData });
-//   } catch (error) {
-//     res.status(500).json({ success: false, message: "Server error", error });
-//   }
-// });
-
-
-// Fetch properties from all Puducherry variants (case-insensitive)
 router.get("/fetch-Pudhucherry-properties", async (req, res) => {
   try {
     const pondicherryData = await AddModel.find({
@@ -2909,7 +2805,6 @@ router.delete('/delete-ppcId-data', async (req, res) => {
 
     res.status(200).json({ message: 'User Permenent deleted successfully!', deletedUser: userToDelete });
   } catch (error) {
-    console.error("Delete error:", error);
     res.status(500).json({ message: 'Error deleting user.', error });
   }
 });
@@ -3131,7 +3026,6 @@ router.delete('/delete-all-properties', async (req, res) => {
     const result = await AddModel.deleteMany({}); // Deletes all documents in the collection
     res.status(200).json({ message: 'All properties deleted successfully.', deletedCount: result.deletedCount });
   } catch (error) {
-    console.error('Error deleting all properties:', error);
     res.status(500).json({ message: 'Error deleting all properties.' });
   }
 });
@@ -3452,7 +3346,6 @@ router.get('/approved-properties-count', async (req, res) => {
 
     res.status(200).json({ approvedProperties: count });
   } catch (error) {
-    console.error("Error fetching approved properties count:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });

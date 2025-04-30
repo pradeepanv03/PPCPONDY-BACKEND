@@ -5,6 +5,68 @@ const router = express.Router();
 const BuyerAssistance = require("../BuyerAssistance/BuyerAssistanceModel");
 const AddModel = require('../AddModel');
 const NotificationUser = require('../Notification/NotificationDetailModel');
+const PricingPlans = require("../plans/PricingPlanModel"); // import your PricingPlans model
+
+
+
+router.get("/get-buyerAssistance", async (req, res) => {
+  const { phoneNumber } = req.query; // Extract phoneNumber from query
+
+  try {
+    // 1. Fetch Buyer Assistance requests
+    const requests = await BuyerAssistance.find({ phoneNumber });
+
+    // 2. Fetch the user's plan details
+    const userPlan = await PricingPlans.findOne({ phoneNumber });
+
+    let planName = 'N/A';
+    let planCreatedAt = 'N/A';
+    let durationDays = 0;
+    let planExpiryDate = 'N/A';
+    let packageType = 'N/A';
+
+    if (userPlan) {
+      planName = userPlan.name || 'N/A';
+      
+      planCreatedAt = userPlan.createdAt
+      ? new Date(userPlan.createdAt).toLocaleDateString()
+      : 'N/A';
+      
+      durationDays = userPlan.durationDays || 0;
+      packageType = userPlan.packageType || 'N/A';
+
+      // Calculate expiry date
+      if (userPlan.createdAt && userPlan.durationDays) {
+        const expiryDate = new Date(userPlan.createdAt);
+        expiryDate.setDate(expiryDate.getDate() + durationDays);
+        planExpiryDate = new Date(expiryDate).toLocaleDateString();        
+      }
+    }
+
+    // Send success response
+    res.status(200).json({
+      message: `Buyer Assistance requests and Plan details fetched for phone number: ${phoneNumber}`,
+      planDetails: {
+        planName,
+        planCreatedAt, // Properly formatted creation date
+        durationDays,
+        planExpiryDate, // Properly formatted expiry date
+        packageType,
+      },
+      data: requests, // Buyer Assistance requests
+    });
+
+  } catch (error) {
+
+    // Handle server errors
+    res.status(500).json({
+      message: "Error fetching Buyer Assistance requests by phone number",
+      error: error.message,
+    });
+  }
+});
+
+
 
 router.post('/contact-buyer-send', async (req, res) => {
   const { phoneNumber, ba_id } = req.body;
@@ -193,139 +255,6 @@ router.get("/get-buyer-id/:phoneNumber", async (req, res) => {
 
 
 
-// router.post("/add-buyerAssistance", async (req, res) => {
-//   try {
-//     const { phoneNumber } = req.body;
-
-//     if (!phoneNumber) {
-//       return res.status(400).json({ message: "Phone number is required" });
-//     }
-
-//     // Normalize input: Remove country code if present
-//     let formattedPhoneNumber = phoneNumber.replace(/^\+91/, "").trim();
-
-//     // Check if user already has a ba_id
-//     let existingUser = await BuyerAssistance.findOne({ phoneNumber: formattedPhoneNumber });
-
-//     let newBaId;
-//     if (existingUser) {
-//       newBaId = existingUser.ba_id; // Reuse existing ba_id
-//     } else {
-//       // Find the latest `ba_id`
-//       let lastRecord = await BuyerAssistance.findOne({}, { ba_id: 1 }).sort({ ba_id: -1 });
-
-//       if (lastRecord && lastRecord.ba_id) {
-//         newBaId = lastRecord.ba_id + 1;
-//       } else {
-//         newBaId = 100; // Start from 100 if no records exist
-//       }
-//     }
-
-//     // Create a new Buyer Assistance request
-//     const newRequest = new BuyerAssistance({ 
-//       ...req.body, 
-//       baName: req.body.baName || "Buyer",
-//       phoneNumber: formattedPhoneNumber, 
-//       ba_id: newBaId
-//     });
-
-//     await newRequest.save();
-
-//     // ✅ Create notification (assume admin/support team uses "admin" as phone number)
-//     await NotificationUser.create({
-//       recipientPhoneNumber: phoneNumber, // Could be a group inbox, admin panel, or even dynamic
-//       senderPhoneNumber: formattedPhoneNumber,
-//       message: `New buyer assistance request submitted by ${formattedPhoneNumber}`,
-//       createdAt: new Date(),
-//     });
-
-//     res.status(201).json({ 
-//       message: "Buyer Assistance request added successfully!", 
-//       data: newRequest 
-//     });
-
-//   } catch (error) {
-//     res.status(500).json({ message: "Error adding Buyer Assistance request", error });
-//   }
-// });
-
-
-
-// router.post("/add-buyerAssistance", async (req, res) => {
-//   try {
-//     const { phoneNumber } = req.body;
-
-//     if (!phoneNumber) {
-//       return res.status(400).json({ message: "Phone number is required" });
-//     }
-
-//     let formattedPhoneNumber = phoneNumber.replace(/^\+91/, "").trim();
-
-//     // Check if user already has a ba_id
-//     let existingUser = await BuyerAssistance.findOne({ phoneNumber: formattedPhoneNumber });
-
-//     let newBaId;
-//     if (existingUser) {
-//       newBaId = existingUser.ba_id;
-//     } else {
-//       let lastRecord = await BuyerAssistance.findOne({}, { ba_id: 1 }).sort({ ba_id: -1 });
-//       newBaId = lastRecord && lastRecord.ba_id ? lastRecord.ba_id + 1 : 100;
-//     }
-
-//     const newRequest = new BuyerAssistance({ 
-//       ...req.body, 
-//       baName: req.body.baName || "Buyer",
-//       phoneNumber: formattedPhoneNumber,
-//       ba_id: newBaId
-//     });
-
-//     await newRequest.save();
-
-//     // Notify Admin/Support
-//     await NotificationUser.create({
-//       recipientPhoneNumber: "admin",
-//       senderPhoneNumber: formattedPhoneNumber,
-//       message: `New buyer assistance request submitted by ${formattedPhoneNumber}`,
-//       createdAt: new Date(),
-//     });
-
-//     // 🔔 Notify matching property owners
-//     const matchedProperties = await AddModel.find({
-//       propertyMode: newRequest.propertyMode,
-//       propertyType: newRequest.propertyType,
-//       city: newRequest.city,
-//       area: newRequest.area,
-//       facing: newRequest.facing,
-//       price: {
-//         $gte: Number(newRequest.minPrice),
-//         $lte: Number(newRequest.maxPrice)
-//       }
-//     });
-
-//     for (let property of matchedProperties) {
-//       await NotificationUser.create({
-//         recipientPhoneNumber: property.phoneNumber,
-//         senderPhoneNumber: formattedPhoneNumber,
-//         message: `A new buyer request matches your property in ${property.area} (${property.propertyType})`,
-//         createdAt: new Date(),
-//       });
-//     }
-
-//     res.status(201).json({ 
-//       message: "Buyer Assistance request added successfully!", 
-//       data: newRequest 
-//     });
-
-//   } catch (error) {
-//     res.status(500).json({ message: "Error adding Buyer Assistance request", error });
-//   }
-// });
-
-
-
-
-
-
 router.post("/add-buyerAssistance", async (req, res) => {
   try {
     const { phoneNumber } = req.body;
@@ -336,16 +265,9 @@ router.post("/add-buyerAssistance", async (req, res) => {
 
     let formattedPhoneNumber = phoneNumber.replace(/^\+91/, "").trim();
 
-    // Check if user already has a ba_id
-    let existingUser = await BuyerAssistance.findOne({ phoneNumber: formattedPhoneNumber });
-
-    let newBaId;
-    if (existingUser) {
-      newBaId = existingUser.ba_id;
-    } else {
-      let lastRecord = await BuyerAssistance.findOne({}, { ba_id: 1 }).sort({ ba_id: -1 });
-      newBaId = lastRecord && lastRecord.ba_id ? lastRecord.ba_id + 1 : 100;
-    }
+    // Always generate a new ba_id
+    let lastRecord = await BuyerAssistance.findOne({}, { ba_id: 1 }).sort({ ba_id: -1 });
+    let newBaId = lastRecord && lastRecord.ba_id ? lastRecord.ba_id + 1 : 100;
 
     const newRequest = new BuyerAssistance({ 
       ...req.body, 
@@ -387,7 +309,7 @@ router.post("/add-buyerAssistance", async (req, res) => {
       });
     }
 
-    // 🔔 Notify the buyer (if any matching properties found)
+    // 🔔 Notify the buyer (if matching properties found)
     if (matchedProperties.length > 0) {
       await NotificationUser.create({
         recipientPhoneNumber: formattedPhoneNumber,
@@ -403,8 +325,22 @@ router.post("/add-buyerAssistance", async (req, res) => {
     });
 
   } catch (error) {
-    console.error("Error adding buyer assistance request:", error);
     res.status(500).json({ message: "Error adding Buyer Assistance request", error });
+  }
+});
+
+
+
+router.get("/get-buyerAssistance-all", async (req, res) => {
+  try {
+    const buyerAssistances = await BuyerAssistance.find({ isDeleted: false }).sort({ createdAt: -1 });
+
+    res.status(200).json({
+      message: "Buyer Assistance data fetched successfully!",
+      data: buyerAssistances
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching Buyer Assistance data", error });
   }
 });
 
@@ -426,11 +362,11 @@ router.get("/buyer-assistance-count", async (req, res) => {
 });
 
 
+
 router.post('/get-matched-property', async (req, res) => {
   try {
     const { ba_id, phoneNumber } = req.body;
 
-    // Validate that either ba_id or phoneNumber is provided
     if (!ba_id && !phoneNumber) {
       return res.status(400).json({ success: false, message: "Either ba_id or phoneNumber must be provided" });
     }
@@ -499,7 +435,7 @@ router.post('/get-matched-property', async (req, res) => {
 
 
 // Get All Buyer Assistance Requests
-router.get("/get-buyerAssistance", async (req, res) => {
+router.get("/get-buyerAssistances", async (req, res) => {
   try {
     const requests = await BuyerAssistance.find({});
     res.status(200).json({
@@ -513,7 +449,7 @@ router.get("/get-buyerAssistance", async (req, res) => {
 
 
 // Get Buyer Assistance Requests by Phone Number
-router.get("/get-buyerAssistance/:phoneNumber", async (req, res) => {
+router.get("/get-user-buyerAssistance/:phoneNumber", async (req, res) => {
   const { phoneNumber } = req.params;
 
   try {
@@ -529,6 +465,97 @@ router.get("/get-buyerAssistance/:phoneNumber", async (req, res) => {
     });
   }
 });
+
+router.get("/get-user-buyerAssistance-count/:phoneNumber", async (req, res) => {
+  const { phoneNumber } = req.params;
+
+  try {
+    const count = await BuyerAssistance.countDocuments({
+      phoneNumber: { $exists: true, $eq: phoneNumber }, // Explicit filter
+    });
+
+    res.status(200).json({
+      message: `Buyer Assistance request count fetched for phone number: ${phoneNumber}`,
+      count,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Error fetching Buyer Assistance request count by phone number",
+      error,
+    });
+  }
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+router.get("/get-buyerAssistance-all-plans", async (req, res) => {
+  try {
+    // 1. Fetch all Buyer Assistance requests
+    const requests = await BuyerAssistance.find();
+
+    // 2. Create a set of unique phone numbers from the requests
+    const phoneNumbers = [...new Set(requests.map(req => req.phoneNumber))];
+
+    // 3. Fetch all user plans matching those phone numbers
+    const plans = await PricingPlans.find({ phoneNumber: { $in: phoneNumbers } });
+
+    // 4. Create a map for quick lookup of plan by phone number
+    const planMap = {};
+    plans.forEach(plan => {
+      const expiryDate = new Date(plan.createdAt);
+      expiryDate.setDate(expiryDate.getDate() + (plan.durationDays || 0));
+      planMap[plan.phoneNumber] = {
+        planName: plan.name || 'N/A',
+        planCreatedAt: plan.createdAt ? new Date(plan.createdAt).toLocaleDateString() : 'N/A',
+        durationDays: plan.durationDays || 0,
+        planExpiryDate: expiryDate.toLocaleDateString(),
+        packageType: plan.packageType || 'N/A',
+      };
+    });
+
+    // 5. Combine each request with its plan info
+    const enrichedData = requests.map(req => ({
+      ...req._doc,
+      planDetails: planMap[req.phoneNumber] || {
+        planName: 'N/A',
+        planCreatedAt: 'N/A',
+        durationDays: 0,
+        planExpiryDate: 'N/A',
+        packageType: 'N/A',
+      }
+    }));
+
+    // 6. Send response
+    res.status(200).json({
+      message: "All Buyer Assistance requests with plan details fetched",
+      data: enrichedData,
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      message: "Error fetching all Buyer Assistance requests",
+      error: error.message,
+    });
+  }
+});
+
+
+
+
+
 
 
 // Get count of Buyer Assistance Requests by Phone Number
@@ -762,9 +789,291 @@ router.get("/fetch-buyer-matched-properties-by-phone", async (req, res) => {
 
 
 
+
+router.get("/fetch-buyerAssistance/:ba_id", async (req, res) => {
+  const { ba_id } = req.params;
+
+  if (!ba_id) {
+    return res.status(400).json({ message: "BA ID is required" });
+  }
+
+  try {
+    const request = await BuyerAssistance.findOne({ ba_id });
+    if (!request) {
+      return res.status(404).json({ message: "Request not found" });
+    }
+    res.status(200).json({ message: "Buyer Assistance request fetched successfully!", data: request });
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching Buyer Assistance request", error });
+  }
+});
+
+
+
+router.get("/fetch-matched-datas-buyer", async (req, res) => {
+  try {
+    const { phoneNumber } = req.query;
+
+    if (!phoneNumber) {
+      return res
+        .status(400)
+        .json({ message: "Buyer Assistance phone number is required" });
+    }
+
+    // Normalize the phone number
+    const normalizedPhone = normalizePhone(phoneNumber);
+
+    // Fetch all Buyer Assistance requests for this phone number
+    const buyerRequests = await BuyerAssistance.find({
+      phoneNumber: { $regex: new RegExp(`${normalizedPhone}$`, "i") },
+    });
+
+    if (!buyerRequests.length) {
+      return res
+        .status(404)
+        .json({ message: "No Buyer Assistance requests found for this phone number" });
+    }
+
+    const matchedData = [];
+
+    for (let buyerRequest of buyerRequests) {
+      // Fetch matched properties
+      const matchedProperties = await AddModel.find({
+        propertyMode: buyerRequest.propertyMode,
+        propertyType: buyerRequest.propertyType,
+        city: buyerRequest.city,
+        area: buyerRequest.area,
+        facing: buyerRequest.facing,
+       
+        price: {
+          $gte: Number(buyerRequest.minPrice),
+          $lte: Number(buyerRequest.maxPrice),
+        },
+      });
+
+      // Only add buyer assistance with matched properties
+      if (matchedProperties.length > 0) {
+        matchedData.push({
+          buyerAssistanceCard: {
+            _id:buyerRequest._id,
+            Ba_Id:buyerRequest.ba_id,
+            name: buyerRequest.baName,
+            phoneNumber: buyerRequest.phoneNumber,
+            city: buyerRequest.city,
+            area: buyerRequest.area,
+            minPrice: buyerRequest.minPrice,
+            maxPrice:buyerRequest.maxPrice,
+            propertyType: buyerRequest.propertyType,
+            facing: buyerRequest.facing,
+            propertyAge: buyerRequest.propertyAge,
+            propertyMode: buyerRequest.propertyMode,
+            paymentType: buyerRequest.paymentType,
+            bankLoan: buyerRequest.bankLoan,
+          },
+          matchedProperties: matchedProperties.map((property) => ({
+            propertyId: property.ppcId,
+            postedByUser: property.phoneNumber,
+            price: property.price,
+            city: property.city,
+            area: property.area,
+            state: property.state,
+            propertyType: property.propertyType,
+            facing: property.facing,
+            bedrooms:property.bedrooms,
+        totalArea:property.totalArea,
+        areaUnit:property.areaUnit,
+        postedBy:property.postedBy,
+        createdAt:property.createdAt,
+          })),
+        });
+      }
+    }
+
+    if (matchedData.length === 0) {
+      return res.status(404).json({ message: "No matched properties found" });
+    }
+
+    res.status(200).json({
+      message: "Matched Data Fetched Successfully!",
+      totalMatches: matchedData.length,
+      data: matchedData,
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error });
+  }
+});
+
+
+
+
+
+
+router.get("/fetch-matched-data-owner", async (req, res) => {
+  try {
+    const { phoneNumber } = req.query;
+
+    if (!phoneNumber) {
+      return res.status(400).json({ message: "Phone number is required" });
+    }
+
+    // Fetch all properties posted by the owner
+    const properties = await AddModel.find({ phoneNumber });
+
+    if (!properties.length) {
+      return res
+        .status(404)
+        .json({ message: "No properties found for this owner" });
+    }
+
+    const matchedData = [];
+
+    for (let property of properties) {
+      // Match buyer assistance for each property
+      const conditions = {
+        propertyMode: property.propertyMode,
+        propertyType: property.propertyType,
+        city: property.city,
+        area: property.area,
+        facing: property.facing,
+        minPrice: { $lte: property.price },
+        maxPrice: { $gte: property.price },
+      };
+
+      const matchedBuyers = await BuyerAssistance.find(conditions);
+
+      if (matchedBuyers.length > 0) {
+        matchedData.push({
+          propertyDetails: {
+            propertyId: property.ppcId,
+            postedByUser: property.phoneNumber,
+            price: property.price,
+            city: property.city,
+            area: property.area,
+            state: property.state,
+            propertyMode:property.propertyMode,
+            propertyType: property.propertyType,
+            facing: property.facing,
+            bedrooms:property.bedrooms,
+            totalArea:property.totalArea,
+            areaUnit:property.areaUnit,
+            postedBy:property.postedBy,
+            createdAt:property.createdAt,
+
+          },
+          matchedBuyerRequests: matchedBuyers.map((buyer) => ({
+            name: buyer.baName,
+            phoneNumber: buyer.phoneNumber,
+            city: buyer.city,
+            area: buyer.area,
+            priceRange: `${buyer.minPrice} - ${buyer.maxPrice}`,
+            propertyType: buyer.propertyType,
+            facing: buyer.facing,
+            propertyAge: buyer.propertyAge,
+            Ba_Id: buyer.ba_id,
+          })),
+        });
+      }
+    }
+    if (!matchedData.length) {
+      return res
+        .status(404)
+        .json({ message: "No matched buyer assistance requests found" });
+    }
+
+    res.status(200).json({
+      message: "Buyer-Matched Assistance Requests fetched successfully!",
+      totalMatches: matchedData.length,
+      data: matchedData,
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error });
+  }
+});
+
+
+
+
+// *************** all buyer with matched property ***************
+
+// Function to normalize phone numbers
 const normalizePhone = (phone) => {
   return phone.replace(/\D/g, "").slice(-10);
 };
+
+router.get("/fetch-matched-data-buyer", async (req, res) => {
+  try {
+    const { phoneNumber } = req.query;
+
+    if (!phoneNumber) {
+      return res
+        .status(400)
+        .json({ message: "Buyer Assistance phone number is required" });
+    }
+
+    // Normalize the phone number
+    const normalizedPhone = normalizePhone(phoneNumber);
+
+    // Fetch all Buyer Assistance requests for this phone number
+    const buyerRequests = await BuyerAssistance.find({
+      phoneNumber: { $regex: new RegExp(`${normalizedPhone}$`, "i") },
+    });
+
+    if (!buyerRequests.length) {
+      return res
+        .status(404)
+        .json({ message: "No Buyer Assistance requests found for this phone number" });
+    }
+
+    let matchedData = [];
+
+    for (let buyerRequest of buyerRequests) {
+      // Fetch matched properties based on buyer assistance criteria
+      const matchedProperties = await AddModel.find({
+        propertyMode: buyerRequest.propertyMode,
+        propertyType: buyerRequest.propertyType,
+        city: buyerRequest.city,
+        area: buyerRequest.area,
+        facing: buyerRequest.facing,
+       
+        price: {
+          $gte: Number(buyerRequest.minPrice),
+          $lte: Number(buyerRequest.maxPrice),
+        },
+      });
+
+      matchedData.push({
+        buyerAssistanceCard: {
+          name: buyerRequest.baName,
+          phoneNumber: buyerRequest.phoneNumber,
+          city: buyerRequest.city,
+          area: buyerRequest.area,
+          priceRange: `${buyerRequest.minPrice} - ${buyerRequest.maxPrice}`,
+          propertyType: buyerRequest.propertyType,
+          facing: buyerRequest.facing,
+          propertyAge: buyerRequest.propertyAge,
+        },
+        matchedProperties: matchedProperties.map((property) => ({
+          propertyId: property.ppcId,
+          postedByUser: property.phoneNumber,
+          price: property.price,
+          city: property.city,
+          area: property.area,
+          state: property.state,
+          propertyType: property.propertyType,
+          facing: property.facing,
+        })),
+      });
+    }
+
+    res.status(200).json({
+      message: "Matched Data Fetched Successfully!",
+      totalMatches: matchedData.length,
+      data: matchedData,
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error });
+  }
+});
 
 
 
@@ -872,6 +1181,8 @@ router.get("/fetch-matched-buyers-for-owner", async (req, res) => {
 });
 
 
+
+// ********************************************************************************************
 
 router.get("/fetch-buyer-matched-properties/count", async (req, res) => {
   try {
@@ -1097,6 +1408,8 @@ router.put("/update-status-buyer-assistance/:id", async (req, res) => {
     res.status(500).json({ message: "Server error", error });
   }
 });
+
+
 
 router.get("/buyer-assistance-interests", async (req, res) => {
   try {
