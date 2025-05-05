@@ -9,6 +9,8 @@ const NotificationUser = require('./Notification/NotificationDetailModel');
 const DeletedAddModel = require ('./DeleteModel');
 const UserLogin = require('./user/UserModel'); 
 const PricingPlans = require('./plans/PricingPlanModel');
+const Bill = require('./CreateBill/BillModel');
+const FollowUp = require('./FollowUp/FollowUpModel'); // Import your model
 
 
 const multer = require('multer');
@@ -147,6 +149,7 @@ router.get("/property/:ppcId", async (req, res) => {
 
     res.status(200).json(property);
   } catch (error) {
+    console.error("Error fetching property:", error);
     res.status(500).json({ message: "Internal Server Error", error: error.message });
   }
 });
@@ -213,6 +216,7 @@ router.get("/user-viewed-properties", async (req, res) => {
 
     res.status(200).json({ viewedProperties: userViews.viewedProperties });
   } catch (error) {
+    console.error("Error fetching viewed properties:", error);
     res.status(500).json({ message: "Internal Server Error", error: error.message });
   }
 });
@@ -274,6 +278,7 @@ router.post("/user-viewed-property", async (req, res) => {
 
     res.status(200).json({ message: "Property view recorded and notification sent" });
   } catch (error) {
+    console.error("Error recording property view:", error);
     res.status(500).json({ message: "Internal Server Error", error: error.message });
   }
 });
@@ -737,6 +742,13 @@ router.get("/user-viewed-properties", async (req, res) => {
       (a, b) => new Date(b.viewedAt) - new Date(a.viewedAt)
     );
 
+    // // Optional: fetch notifications for viewed properties
+    // const viewedPpcIds = sortedViews.map(view => view.ppcId);
+    // const relatedNotifications = await NotificationUser.find({
+    //   senderPhoneNumber: normalizedPhoneNumber,
+    //   ppcId: { $in: viewedPpcIds }
+    // }).sort({ createdAt: -1 });
+
     res.status(200).json({
       viewedProperties: sortedViews,
       // notifications: relatedNotifications
@@ -749,6 +761,62 @@ router.get("/user-viewed-properties", async (req, res) => {
 
 
 
+
+// router.post("/user-viewed-property", async (req, res) => {
+//   try {
+//     const { phoneNumber, ppcId } = req.body;
+
+//     if (!phoneNumber || !ppcId) {
+//       return res.status(400).json({ message: "phoneNumber and ppcId are required" });
+//     }
+
+//     const normalizedPhoneNumber = phoneNumber.replace(/\s+/g, "").replace(/\+/g, "");
+
+//     const property = await AddModel.findOne({ ppcId });
+//     if (!property) {
+//       return res.status(404).json({ message: "Property not found" });
+//     }
+
+//     const propertyOwnerPhoneNumber = property.phoneNumber;
+
+//     let userViews = await UserViewsModel.findOne({ phoneNumber: normalizedPhoneNumber });
+
+//     const newViewEntry = {
+//       ppcId,
+//       viewerPhoneNumber: normalizedPhoneNumber,
+//       propertyOwnerPhoneNumber,
+//       viewedAt: new Date(),
+//     };
+
+//     if (!userViews) {
+//       userViews = new UserViewsModel({
+//         phoneNumber: normalizedPhoneNumber,
+//         viewedProperties: [newViewEntry],
+//       });
+//     } else {
+//       const alreadyViewed = userViews.viewedProperties.some(view => view.ppcId === ppcId);
+//       if (!alreadyViewed) {
+//         userViews.viewedProperties.push(newViewEntry);
+//       }
+//     }
+
+//     await userViews.save();
+
+//     await AddModel.updateOne({ ppcId }, { $inc: { views: 1 } });
+
+//     await NotificationUser.create({
+//       recipientPhoneNumber: propertyOwnerPhoneNumber,
+//       senderPhoneNumber: normalizedPhoneNumber,
+//       message: `Your property (ID: ${ppcId}) was viewed by a user.`,
+//       ppcId: ppcId,
+//       createdAt: new Date(),
+//     });
+
+//     res.status(200).json({ message: "Property view recorded and notification sent" });
+//   } catch (error) {
+//     res.status(500).json({ message: "Internal Server Error", error: error.message });
+//   }
+// });
 
 
 
@@ -995,6 +1063,219 @@ router.get("/property-buyer-viewed", async (req, res) => {
 
 
 
+// router.post(
+//   '/update-property',
+//   upload.fields([{ name: 'video', maxCount: 1 }, { name: 'photos', maxCount: 15 }]),
+//   async (req, res) => {
+//     if (req.fileValidationError) {
+//       return res.status(400).json({ message: req.fileValidationError });
+//     }
+//     if (req.files['video'] && req.files['video'][0].size > 50 * 1024 * 1024) {
+//       return res.status(400).json({ message: 'Video file size exceeds 50MB.' });
+//     }
+
+//     const {
+//       ppcId,
+//       phoneNumber,
+//       price,
+//       rentalPropertyAddress,
+//       state,
+//       city,
+//       district,
+//       area,
+//       streetName,
+//       doorNumber,
+//       nagar,
+//       ownerName,
+//       email,
+//       alternatePhone,
+//       countryCode,
+//       alternateCountryCode,
+//       propertyMode,
+//       propertyType,
+//       bankLoan,
+//       negotiation,
+//       ownership,
+//       bedrooms,
+//       kitchen,
+//       kitchenType,
+//       balconies,
+//       floorNo,
+//       areaUnit,
+//       propertyApproved,
+//       propertyAge,
+//       postedBy,
+//       facing,
+//       salesMode,
+//       salesType,
+//       furnished,
+//       lift,
+//       attachedBathrooms,
+//       western,
+//       numberOfFloors,
+//       carParking,
+//       bestTimeToCall,
+//       totalArea,
+//       length,
+//       breadth,
+//     } = req.body;
+
+//     if (!ppcId) {
+//       return res.status(400).json({ message: 'PPC-ID is required.' });
+//     }
+
+//     try {
+//       const user = await AddModel.findOne({ ppcId });
+//       if (!user) {
+//         return res.status(404).json({ message: 'User not found.' });
+//       }
+
+//       // Update fields dynamically
+//       const fieldsToUpdate = {
+//         phoneNumber, price, rentalPropertyAddress, state, city, district, area, 
+//         streetName, doorNumber, nagar, ownerName, email, alternatePhone, countryCode, 
+//         alternateCountryCode, propertyMode, propertyType, bankLoan, negotiation, ownership, 
+//         bedrooms, kitchen, kitchenType, balconies, floorNo, areaUnit, propertyApproved, 
+//         propertyAge, postedBy, facing, salesMode, salesType, furnished, lift, 
+//         attachedBathrooms, western, numberOfFloors, carParking, bestTimeToCall, totalArea,
+//         length, breadth,
+//       };
+
+//       for (const key in fieldsToUpdate) {
+//         if (fieldsToUpdate[key]) {
+//           user[key] = fieldsToUpdate[key];
+//         }
+//       }
+
+//       // Handle file uploads
+//       if (req.files) {
+//         if (req.files['video']) {
+//           user.video = req.files['video'][0].path;
+//         }
+//         if (req.files['photos']) {
+//           user.photos = req.files['photos'].map((file) => file.path);
+//         }
+//       }
+
+//       // Required fields to check for "complete" status
+//       const requiredFields = [
+//         'ppcId',
+//         'phoneNumber',
+//         'price',
+//         'propertyMode',
+//         'propertyType',
+//         'areaUnit',
+//         'salesType',
+//         'totalArea',
+//         'postedBy',
+//       ];
+      
+
+//       const isComplete = requiredFields.every((field) => user[field]);
+//       user.status = isComplete ? 'complete' : 'incomplete';
+
+//       await user.save();
+
+//       // Save notification
+//       try {
+//         await NotificationUser.create({
+//           recipientPhoneNumber: user.phoneNumber,
+//           senderPhoneNumber: user.phoneNumber,
+//           userPhoneNumber: user.phoneNumber,
+//           ppcId: user.ppcId,
+//           type: 'property-Add',
+//           message: `Your property (${user.ppcId}) has been Added successfully.`,
+//           createdAt: new Date(),
+//         });
+//       } catch (notifErr) {
+//         console.error('Notification creation failed:', notifErr.message);
+//       }
+
+//       res.status(200).json({
+//         message: 'Property details updated successfully!',
+//         ppcId: user.ppcId,
+//         propertyStatus: user.status,
+//         user,
+//       });
+//     } catch (error) {
+//       res.status(500).json({ message: 'Error updating property details.', error });
+//     }
+//   }
+// );
+
+
+
+// router.get('/fetch-all-datas', async (req, res) => {
+//   try {
+//     const requiredFields = [
+//       'ppcId',
+//       'phoneNumber',
+//       'price',
+//       'propertyMode',
+//       'propertyType',
+//       // 'areaUnit',
+//       // 'salesType',
+//       // 'totalArea',
+//       // 'postedBy'
+//     ];
+
+//     // Build query to ensure all required fields are present and not empty
+//     const query = {
+//       $and: requiredFields.map(field => ({
+//         [field]: { $exists: true, $ne: null, $ne: '' }
+//       }))
+//     };
+
+//     const users = await AddModel.find(query);
+
+//     res.status(200).json({
+//       message: 'Filtered user data with all required fields fetched successfully!',
+//       users
+//     });
+//   } catch (error) {
+//     res.status(500).json({
+//       message: 'Error fetching user data with required fields.',
+//       error: error.message
+//     });
+//   }
+// });
+
+
+// router.get('/fetch-all-datas', async (req, res) => {
+//   try {
+//     const requiredFields = [
+//       'ppcId',
+//       'phoneNumber',
+//       'price',
+//       'propertyMode',
+//       'propertyType',
+//     ];
+
+//     const query = {
+//       $and: requiredFields.map(field => ({
+//         [field]: { $exists: true, $ne: null, $ne: '' }
+//       }))
+//     };
+
+//     const users = await AddModel.find(query);
+
+//     const total = await AddModel.countDocuments();
+//     const matching = users.length;
+
+//     res.status(200).json({
+//       message: `Filtered user data fetched: ${matching} of ${total} matched.`,
+//       users
+//     });
+//   } catch (error) {
+//     res.status(500).json({
+//       message: 'Error fetching user data.',
+//       error: error.message
+//     });
+//   }
+// });
+
+
+
 
 router.post(
   '/update-property',
@@ -1092,16 +1373,23 @@ router.post(
         }
       }
 
-
+      // Check if all required fields are filled
       const requiredFields = [
-        'phoneNumber', 'price', 'rentalPropertyAddress', 'state', 'city',
-        'area' , 'ownerName', 'email', 'propertyMode',
-        'propertyType', 'ownership',  'areaUnit',
-        'propertyApproved', 'propertyAge', 'postedBy', 'facing', 'salesMode', 'salesType',
-        'furnished', 'carParking', 'totalArea',
-        'length',
-        'breadth',
+        'ppcId','phoneNumber', 'price',     'propertyMode',
+        'propertyType',   'postedBy', 'areaUnit', 'salesType',
+       'totalArea',
       ];
+
+
+      // const requiredFields = [
+      //   'phoneNumber', 'price', 'rentalPropertyAddress', 'state', 'city',
+      //   'area' , 'ownerName', 'email', 'propertyMode',
+      //   'propertyType', 'ownership',  'areaUnit',
+      //   'propertyApproved', 'propertyAge', 'postedBy', 'facing', 'salesMode', 'salesType',
+      //   'furnished', 'carParking', 'totalArea',
+      //   'length',
+      //   'breadth',
+      // ];
 
 
       const isComplete = requiredFields.every((field) => user[field]);
@@ -1139,6 +1427,24 @@ try {
 
 
 
+
+router.get('/fetch-property-dropdowns', async (req, res) => {
+  try {
+    const [ propertyTypes] = await Promise.all([
+      AddModel.distinct('propertyType', { propertyType: { $ne: null } })
+    ]);
+
+    res.status(200).json({
+      message: 'Property dropdown values fetched successfully',
+      propertyModes,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: 'Error fetching dropdown values',
+      error: error.message,
+    });
+  }
+});
 
 
 
@@ -1243,6 +1549,7 @@ router.get("/pending-properties-count", async (req, res) => {
 
     res.status(200).json({ pendingProperties: count });
   } catch (error) {
+    console.error("Error counting pending properties:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
@@ -1823,6 +2130,48 @@ router.delete('/delete-viewed-property/:ppcId', async (req, res) => {
 });
 
 
+// // Route to get all property data
+// router.get('/properties', async (req, res) => {
+//   try {
+//     const properties = await AddModel.find(); // Get all properties
+//     res.status(200).json(properties); // Return the properties as JSON
+//   } catch (err) {
+//     res.status(500).json({ error: 'Failed to retrieve properties', message: err.message });
+//   }
+// });
+
+
+
+// router.get('/uploads-count', async (req, res) => {
+//   const { ppcId } = req.query; // Use query params to pass ppcId
+
+//   // Ensure `ppcId` is provided
+//   if (!ppcId) {
+//     return res.status(400).json({ message: 'Property ID (ppcId) is required' });
+//   }
+
+//   try {
+//     // Find the property by `ppcId`
+//     const property = await AddModel.findOne({ ppcId });
+
+//     if (!property) {
+//       return res.status(404).json({ message: 'Property not found' });
+//     }
+
+//     // Count the number of uploaded images
+//     const uploadedImagesCount = property.photos ? property.photos.length : 0;
+
+//     return res.status(200).json({
+//       message: 'Uploaded images count retrieved successfully',
+//       uploadedImagesCount,
+//       uploadedImages: property.photos || [], // Return the array of uploaded image filenames
+//     });
+//   } catch (error) {
+//     return res.status(500).json({ message: 'Internal Server Error', error: error.message });
+//   }
+// });
+
+
 router.get('/latest-ppcid', async (req, res) => {
     try {
         const latestProperty = await AddModel.findOne().sort({ ppcId: -1 });
@@ -1832,6 +2181,22 @@ router.get('/latest-ppcid', async (req, res) => {
     }
 });
 
+
+// router.post("/store-id", async (req, res) => {
+//   try {
+
+//     const latestProperty = await AddModel.findOne().sort({ ppcId: -1 });
+
+//     const nextPpcId = latestProperty ? latestProperty.ppcId + 1 : 1001;
+
+//     const newUser = new AddModel({ ppcId: nextPpcId });
+//     const savedUser = await newUser.save();
+
+//     res.status(201).json({ message: "PPC-ID created and stored successfully!", ppcId: nextPpcId });
+//   } catch (error) {
+//     res.status(500).json({ message: "Error storing PPC-ID.", error });
+//   }
+// });
 
 
 router.post("/store-id", async (req, res) => {
@@ -1982,6 +2347,27 @@ router.delete('/delete-viewed-property/:ppcId', async (req, res) => {
 });
 
 
+
+// // Store new user data without PPC-ID
+// router.post('/store-phone', async (req, res) => {
+//     const { phoneNumber } = req.body;
+  
+//     if (!phoneNumber) {
+//       return res.status(400).json({ message: 'Phone number is required.' });
+//     }
+  
+//     try {
+  
+//       // Create new user with the provided phone number
+//       const newUser = new AddModel({ phoneNumber });
+//       await newUser.save();
+  
+//       res.status(201).json({ message: 'User added successfully!' });
+//     } catch (error) {
+//       res.status(500).json({ message: 'Error storing user details.', error });
+//     }
+//   });
+  
 
 
   router.post('/store-data', async (req, res) => {
@@ -2331,9 +2717,196 @@ router.get('/edit-property/:ppcId', async (req, res) => {
 
 
 
-router.get('/fetch-alls-datas', async (req, res) => {
+
+// router.get('/fetch-data', async (req, res) => {
+//     const { phoneNumber, ppcId } = req.query;
+
+//     // Ensure at least one parameter is provided
+//     if (!phoneNumber && !ppcId) {
+//         return res.status(400).json({ message: 'Either phone number or PPC-ID is required.' });
+//     }
+
+//     try {
+
+//         // Normalize phone number (remove spaces, dashes, country code, and ensure consistency)
+//         const normalizedPhoneNumber = phoneNumber
+//             ? phoneNumber.replace(/[\s-]/g, '').replace(/^(\+91|91|0)/, '').trim() // Remove country code, spaces, dashes
+//             : null;
+
+//         // Build query dynamically based on the provided parameters
+//         const query = {};
+//         if (normalizedPhoneNumber) query.phoneNumber = new RegExp(normalizedPhoneNumber + '$'); // Match phone number ending with the query
+//         if (ppcId) query.ppcId = ppcId;
+
+
+//         // Fetch user from the database
+//         const user = await AddModel.find(query);
+
+//         // Check if user exists
+//         if (!user) {
+//             return res.status(404).json({ message: 'User not found.' });
+//         }
+
+//         res.status(200).json({ message: 'User data fetched successfully!', user });
+//     } catch (error) {
+//         res.status(500).json({ message: 'Error fetching user details.', error });
+//     }
+// });
+
+
+
+
+// router.get('/fetch-alls-datas', async (req, res) => {
+//   try {
+//     const users = await AddModel.find({});
+// w
+//     const requiredFields = [
+//       'propertyMode', 'propertyType', 'price',
+//       'totalArea', 'areaUnit',
+//       'salesType', 'postedBy'
+//     ];
+
+//     const processedUsers = users.map((user) => {
+//       // Check if all required fields are non-empty and not null/undefined
+//       const isComplete = requiredFields.every(
+//         (field) =>
+//           user[field] !== undefined &&
+//           user[field] !== null &&
+//           String(user[field]).trim() !== ''
+//       );
+
+//       return {
+//         ...user._doc,
+//         required: isComplete ? "yes" : "no",
+//       };
+//     });
+
+//     res.status(200).json({
+//       message: "All user data fetched successfully!",
+//       users: processedUsers
+//     });
+//   } catch (error) {
+//     res.status(500).json({ message: 'Error fetching all user details.', error });
+//   }
+// });
+
+
+// router.get('/fetch-alls-datas', async (req, res) => {
+//   try {
+//     const users = await AddModel.find({});
+
+//     const requiredFields = [
+//       'propertyMode', 'propertyType', 'price',
+//       'totalArea', 'areaUnit',
+//       'salesType', 'postedBy'
+//     ];
+
+//     const processedUsers = users.map((user) => {
+//       const isComplete = requiredFields.every(
+//         (field) =>
+//           user[field] !== undefined &&
+//           user[field] !== null &&
+//           String(user[field]).trim() !== ''
+//       );
+
+//       return {
+//         ...user._doc,
+//         required: isComplete ? "yes" : "no",
+//       };
+//     });
+
+//     res.status(200).json({
+//       message: "All user data fetched successfully!",
+//       users: processedUsers
+//     });
+//   } catch (error) {
+//     console.error('Error fetching all user details:', error); // add console for debugging
+//     res.status(500).json({ message: 'Error fetching all user details.', error: error.message });
+//   }
+// });
+
+// router.get('/fetch-alls-datas', async (req, res) => {
+//   try {
+//     const properties = await AddModel.find({});
+//     const plans = await PricingPlans.find();
+
+//     const requiredFields = [
+//       'propertyMode', 'propertyType', 'price',
+//       'totalArea', 'areaUnit',
+//       'salesType', 'postedBy'
+//     ];
+
+//     // Step 1: Calculate ads count per phoneNumber
+//     const adsCountByUser = properties.reduce((acc, property) => {
+//       const phone = property.phoneNumber;
+//       if (!acc[phone]) {
+//         acc[phone] = 1;
+//       } else {
+//         acc[phone]++;
+//       }
+//       return acc;
+//     }, {});
+
+//     // Step 2: Process each property and attach plan + ads count info
+//     const processedProperties = properties.map((property) => {
+//       const isComplete = requiredFields.every(
+//         (field) =>
+//           property[field] !== undefined &&
+//           property[field] !== null &&
+//           String(property[field]).trim() !== ''
+//       );
+
+//       const matchedPlan = plans.find(plan =>
+//         Array.isArray(plan.phoneNumber)
+//           ? plan.phoneNumber.includes(property.phoneNumber)
+//           : plan.phoneNumber === property.phoneNumber
+//       );
+
+//       let planCreatedAt = 'N/A';
+//       let planExpiryDate = 'N/A';
+
+//       if (matchedPlan && matchedPlan.createdAt && matchedPlan.durationDays) {
+//         const expiryDate = new Date(matchedPlan.createdAt).getTime() + matchedPlan.durationDays * 24 * 60 * 60 * 1000;
+//         planCreatedAt = new Date(matchedPlan.createdAt).toLocaleDateString();
+//         planExpiryDate = new Date(expiryDate).toLocaleDateString();
+//       }
+
+//       return {
+//         ...property._doc,
+//         required: isComplete ? "yes" : "no",
+//         planName: matchedPlan?.name || 'N/A',
+//         planCreatedAt,
+//         planExpiryDate,
+//         packageType: matchedPlan?.packageType || 'N/A',
+//         planDuration: matchedPlan?.durationDays || 'N/A',
+//         adsCount: adsCountByUser[property.phoneNumber] || 0,  // 👈 Added per-property ad count
+//       };
+//     });
+
+//     // Optional: array format ads count summary (if needed on frontend)
+//     const adsCountArray = Object.entries(adsCountByUser).map(([phoneNumber, adsCount]) => ({
+//       phoneNumber,
+//       adsCount,
+//     }));
+
+//     res.status(200).json({
+//       message: "All user data with plan info and ads count fetched successfully!",
+//       users: processedProperties,
+//       // adsCountByUser: adsCountArray, // Optional summary
+//     });
+
+//   } catch (error) {
+//     console.error('Error fetching all user details:', error);
+//     res.status(500).json({
+//       message: 'Error fetching all user details.',
+//       error: error.message
+//     });
+//   }
+// });
+
+router.get('/fetch-all-property-details', async (req, res) => {
   try {
-    const users = await AddModel.find({});
+    const properties = await AddModel.find({});
 
     const requiredFields = [
       'propertyMode', 'propertyType', 'price',
@@ -2341,28 +2914,602 @@ router.get('/fetch-alls-datas', async (req, res) => {
       'salesType', 'postedBy'
     ];
 
-    const processedUsers = users.map((user) => {
-      const isComplete = requiredFields.every(
-        (field) =>
-          user[field] !== undefined &&
-          user[field] !== null &&
-          String(user[field]).trim() !== ''
+    const adsCountByUser = properties.reduce((acc, property) => {
+      const phone = property.phoneNumber;
+      acc[phone] = (acc[phone] || 0) + 1;
+      return acc;
+    }, {});
+
+    const filteredProperties = properties.filter(property => {
+      const hasReports = Array.isArray(property.reportProperty) && property.reportProperty.length > 0;
+      const hasHelps = Array.isArray(property.helpRequests) && property.helpRequests.length > 0;
+      return hasReports || hasHelps;
+    });
+
+    const combinedData = filteredProperties.map((property, index) => {
+      const isComplete = requiredFields.every(field =>
+        property[field] !== undefined &&
+        property[field] !== null &&
+        String(property[field]).trim() !== ''
       );
 
+      const helpDetails = (property.helpRequests || []).map(help => ({
+        phoneNumber: help.phoneNumber,
+        selectHelpReason: help.selectHelpReason,
+        comment: help.comment,
+        requestedAt: help.requestedAt
+      }));
+
+      const reportDetails = (property.reportProperty || []).map(report => ({
+        phoneNumber: report.phoneNumber,
+        reason: report.reason,
+        selectReasons: report.selectReasons,
+        date: report.date
+      }));
+
       return {
-        ...user._doc,
+        slNo: index + 1,
+        ppcId: property.ppcId,
+        image: property.photos && property.photos.length > 0 ? property.photos[0] : null,
+        phoneNumber: property.phoneNumber,
+        ownerName: property.ownerName,
+        propertyMode: property.propertyMode,
+        propertyType: property.propertyType,
+        price: property.price,
+        area: property.area,
+        city: property.city,
+        state: property.state,
+        createdBy: property.postedBy,
+        createdAt: property.createdAt,
+        updatedAt: property.updatedAt,
         required: isComplete ? "yes" : "no",
+        adsCount: adsCountByUser[property.phoneNumber] || 0,
+        planName: property.planName || "",
+        status: property.status || "Active",
+        reportDetails,
+        totalReports: reportDetails.length,
+        helpRequests: helpDetails,
+        totalHelpRequests: helpDetails.length
       };
     });
 
     res.status(200).json({
-      message: "All user data fetched successfully!",
-      users: processedUsers
+      success: true,
+      message: "Filtered property data fetched successfully!",
+      data: combinedData
     });
+
   } catch (error) {
-    res.status(500).json({ message: 'Error fetching all user details.', error: error.message });
+    console.error("Error in merged API:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+      error: error.message
+    });
   }
 });
+
+
+
+
+router.get('/fetch-alls-datas', async (req, res) => {
+  try {
+    const properties = await AddModel.find({});
+    const plans = await PricingPlans.find();
+    const bills = await Bill.find();
+    const followups = await FollowUp.find(); // Ensure you're getting follow-ups
+
+    const requiredFields = [
+      'propertyMode', 'propertyType', 'price',
+      'totalArea', 'areaUnit',
+      'salesType', 'postedBy'
+    ];
+
+    const adsCountByUser = properties.reduce((acc, property) => {
+      const phone = property.phoneNumber;
+      acc[phone] = (acc[phone] || 0) + 1;
+      return acc;
+    }, {});
+
+    // ✅ Filter properties to only include those where all required fields are filled
+    const completeProperties = properties.filter((property) =>
+      requiredFields.every(
+        (field) =>
+          property[field] !== undefined &&
+          property[field] !== null &&
+          String(property[field]).trim() !== ''
+      )
+    );
+
+    const processedProperties = completeProperties.map((property) => {
+      const matchedPlan = plans.find(plan =>
+        Array.isArray(plan.phoneNumber)
+          ? plan.phoneNumber.includes(property.phoneNumber)
+          : plan.phoneNumber === property.phoneNumber
+      );
+
+      const matchedBill = bills.find(bill =>
+        bill.ownerPhone === property.phoneNumber || bill.ppId === property.ppcId
+      );
+
+      let adminOffice = 'N/A';
+      let adminName = 'N/A';
+      let billNo = 'N/A';
+      let billDate = 'N/A';
+      let validity = 'N/A';
+      let billExpiryDate = 'N/A';
+
+      if (matchedBill) {
+        adminOffice = matchedBill.adminOffice || 'N/A';
+        adminName = matchedBill.adminName || 'N/A';
+        billNo = matchedBill.billNo || 'N/A';
+        billDate = matchedBill.billDate || 'N/A';
+        validity = matchedBill.validity || 'N/A';
+
+        if (billDate !== 'N/A' && validity !== 'N/A') {
+          const billStart = new Date(billDate).getTime();
+          const billExpiry = billStart + (validity * 24 * 60 * 60 * 1000);
+          billExpiryDate = new Date(billExpiry).toLocaleDateString();
+        }
+      }
+
+      let planCreatedAt = 'N/A';
+      let planExpiryDate = 'N/A';
+
+      if (matchedPlan && matchedPlan.createdAt && matchedPlan.durationDays) {
+        const expiryDate = new Date(matchedPlan.createdAt).getTime() + matchedPlan.durationDays * 24 * 60 * 60 * 1000;
+        planCreatedAt = new Date(matchedPlan.createdAt).toLocaleDateString();
+        planExpiryDate = new Date(expiryDate).toLocaleDateString();
+      }
+
+
+    
+      // Get the latest follow-up admin name for this ppcId
+      const propertyFollowUps = followups
+        .filter(fu => String(fu.ppcId) === String(property.ppcId)) // Ensure matching ppcId
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+   const followUpAdminName = propertyFollowUps.length > 0 
+   ? propertyFollowUps[0]?.adminName || 'Unknown Admin' 
+   : 'N/A';
+
+      return {
+        ...property._doc,
+        required: "yes", // Only "yes" ones are included now
+        adsCount: adsCountByUser[property.phoneNumber] || 0,
+        planName: matchedPlan?.name || 'N/A',
+        planCreatedAt,
+        planExpiryDate,
+        packageType: matchedPlan?.packageType || 'N/A',
+        planDuration: matchedPlan?.durationDays || 'N/A',
+        adminOffice,
+        adminName,
+        billNo,
+        billDate,
+        validity,
+        billExpiryDate,
+        followUpAdminName
+      };
+    });
+
+    res.status(200).json({
+      message: "Only required=YES data fetched successfully.",
+      users: processedProperties,
+    });
+
+  } catch (error) {
+    console.error('Error fetching all user details:', error);
+    res.status(500).json({
+      message: 'Error fetching all user details.',
+      error: error.message
+    });
+  }
+});
+
+
+router.get('/fetch-all-postby-properties', async (req, res) => {
+  try {
+    // Only fetch properties where postedBy exists and is not empty
+    const properties = await AddModel.find({
+      postedBy: { $exists: true, $ne: '' }
+    });
+
+    const plans = await PricingPlans.find();
+    const bills = await Bill.find();
+
+    const requiredFields = [
+      'propertyMode', 'propertyType', 'price',
+      'totalArea', 'areaUnit',
+      'salesType', 'postedBy'
+    ];
+
+    const adsCountByUser = properties.reduce((acc, property) => {
+      const phone = property.phoneNumber;
+      acc[phone] = (acc[phone] || 0) + 1;
+      return acc;
+    }, {});
+
+    const completeProperties = properties.filter((property) =>
+      requiredFields.every(
+        (field) =>
+          property[field] !== undefined &&
+          property[field] !== null &&
+          String(property[field]).trim() !== ''
+      )
+    );
+
+    const incompleteProperties = properties.filter((property) =>
+      !requiredFields.every(
+        (field) =>
+          property[field] !== undefined &&
+          property[field] !== null &&
+          String(property[field]).trim() !== ''
+      )
+    );
+
+    const processedProperties = [...completeProperties, ...incompleteProperties].map((property) => {
+      const matchedPlan = plans.find(plan =>
+        Array.isArray(plan.phoneNumber)
+          ? plan.phoneNumber.includes(property.phoneNumber)
+          : plan.phoneNumber === property.phoneNumber
+      );
+
+      const matchedBill = bills.find(bill =>
+        bill.ownerPhone === property.phoneNumber || bill.ppId === property.ppcId
+      );
+
+      const isComplete = completeProperties.includes(property);
+
+      return {
+        ...property._doc,
+        postedBy: property.postedBy,
+        required: isComplete ? "yes" : "no",
+        adsCount: adsCountByUser[property.phoneNumber] || 0,
+        planName: matchedPlan?.name || 'N/A',
+        packageType: matchedPlan?.packageType || 'N/A',
+        planDuration: matchedPlan?.durationDays || 'N/A',
+        planCreatedAt: matchedPlan?.createdAt ? new Date(matchedPlan.createdAt).toLocaleDateString() : 'N/A',
+        planExpiryDate: matchedPlan?.createdAt && matchedPlan?.durationDays
+          ? new Date(new Date(matchedPlan.createdAt).getTime() + matchedPlan.durationDays * 24 * 60 * 60 * 1000).toLocaleDateString()
+          : 'N/A',
+        adminOffice: matchedBill?.adminOffice || 'N/A',
+        adminName: matchedBill?.adminName || 'N/A',
+        billNo: matchedBill?.billNo || 'N/A',
+        billDate: matchedBill?.billDate || 'N/A',
+        validity: matchedBill?.validity || 'N/A',
+        billExpiryDate: matchedBill?.billDate && matchedBill?.validity
+          ? new Date(new Date(matchedBill.billDate).getTime() + matchedBill.validity * 24 * 60 * 60 * 1000).toLocaleDateString()
+          : 'N/A'
+      };
+    });
+
+    res.status(200).json({
+      message: "Filtered properties with postedBy fetched successfully.",
+      users: processedProperties,
+    });
+
+  } catch (error) {
+    console.error('Error fetching all user details:', error);
+    res.status(500).json({
+      message: 'Error fetching all user details.',
+      error: error.message
+    });
+  }
+});
+
+
+
+
+
+router.get('/fetch-all-expire-property', async (req, res) => {
+  try {
+    const users = await PricingPlans.find();
+    const allProperties = await AddModel.find({});
+    const allBills = await Bill.find();
+    const followups = await FollowUp.find(); // Ensure you're getting follow-ups
+
+    if (!users.length) {
+      return res.status(404).json({ message: 'No users found.' });
+    }
+
+    const adsCountByUser = allProperties.reduce((acc, property) => {
+      const phone = property.phoneNumber;
+      acc[phone] = (acc[phone] || 0) + 1;
+      return acc;
+    }, {});
+
+    const requiredFields = [
+      'propertyMode', 'propertyType', 'price',
+      'totalArea', 'areaUnit',
+      'salesType', 'postedBy'
+    ];
+
+    const userPlansWithProperties = await Promise.all(users.map(async (user) => {
+      const { name: planName, phoneNumber, createdAt, durationDays, packageType } = user;
+
+      const planExpiry = createdAt && durationDays
+        ? new Date(new Date(createdAt).getTime() + durationDays * 24 * 60 * 60 * 1000)
+        : null;
+
+      const formattedCreatedAt = createdAt ? new Date(createdAt).toLocaleDateString() : 'N/A';
+      const formattedExpiryDate = planExpiry ? new Date(planExpiry).toLocaleDateString() : 'N/A';
+
+      const properties = await AddModel.find({
+        phoneNumber: { $in: phoneNumber },
+        status: ['complete', 'incomplete', 'active', 'pending', 'delete'],
+      });
+
+      const enhancedProperties = properties.map((property) => {
+        const hasAllFields = requiredFields.every(field =>
+          property[field] !== undefined &&
+          property[field] !== null &&
+          String(property[field]).trim() !== ''
+        );
+
+        const required = hasAllFields ? 'yes' : 'no';
+        const adsCount = adsCountByUser[property.phoneNumber] || 0;
+
+        const matchedBill = allBills.find(
+          bill => bill.ownerPhone === property.phoneNumber || bill.ppId === property.ppcId
+        );
+
+        const billNo = matchedBill?.billNo || 'N/A';
+        const now = Date.now();
+        const isExpired = planExpiry && planExpiry.getTime() < now;
+
+
+      // Get the latest follow-up admin name for this ppcId
+      const propertyFollowUps = followups
+        .filter(fu => String(fu.ppcId) === String(property.ppcId)) // Ensure matching ppcId
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+   const followUpAdminName = propertyFollowUps.length > 0 
+   ? propertyFollowUps[0]?.adminName || 'Unknown Admin' 
+   : 'N/A';
+
+        return {
+          ...property.toObject(),
+          required,
+          adsCount,
+          adminName,
+          followUpAdminName,
+          billNo,
+          status: property.status, // Corrected: Added status from the property
+          planName,
+          planCreatedAt: formattedCreatedAt,
+          durationDays,
+          planExpiryDate: formattedExpiryDate,
+          packageType: packageType || 'N/A',
+          createdAt: property.createdAt ? new Date(property.createdAt).toLocaleDateString() : 'N/A',
+          updatedAt: property.updatedAt ? new Date(property.updatedAt).toLocaleDateString() : 'N/A',
+        };
+      });
+
+      return {
+        user: {
+          phoneNumber,
+          planName,
+          planCreatedAt: formattedCreatedAt,
+          durationDays,
+          planExpiryDate: formattedExpiryDate,
+          packageType: packageType || 'N/A',
+        },
+        properties: enhancedProperties,
+      };
+    }));
+
+    res.status(200).json({
+      message: "Active and expired properties with user plans fetched successfully!",
+      data: userPlansWithProperties,
+    });
+  } catch (error) {
+    console.error('Error fetching all plans and properties:', error);
+    res.status(500).json({
+      message: 'Error fetching all plans and properties.',
+      error: error.message,
+    });
+  }
+});
+
+
+
+
+// router.get('/fetch-alls-datas', async (req, res) => {
+//   try {
+//     const properties = await AddModel.find({});
+//     const plans = await PricingPlans.find();
+//     const bills = await Bill.find();
+
+//     const requiredFields = [
+//       'propertyMode', 'propertyType', 'price',
+//       'totalArea', 'areaUnit',
+//       'salesType', 'postedBy'
+//     ];
+
+//     const adsCountByUser = properties.reduce((acc, property) => {
+//       const phone = property.phoneNumber;
+//       acc[phone] = (acc[phone] || 0) + 1;
+//       return acc;
+//     }, {});
+
+//     const processedProperties = properties.map((property) => {
+//       const isComplete = requiredFields.every(
+//         (field) =>
+//           property[field] !== undefined &&
+//           property[field] !== null &&
+//           String(property[field]).trim() !== ''
+//       );
+
+//       // Match plan
+//       const matchedPlan = plans.find(plan =>
+//         Array.isArray(plan.phoneNumber)
+//           ? plan.phoneNumber.includes(property.phoneNumber)
+//           : plan.phoneNumber === property.phoneNumber
+//       );
+
+//       // Match bill using phone or ppId
+//       const matchedBill = bills.find(bill =>
+//         bill.ownerPhone === property.phoneNumber || bill.ppId === property.ppcId
+//       );
+
+//       // Default bill-related fields
+//       let adminOffice = 'N/A';
+//       let adminName = 'N/A';
+//       let billNo = 'N/A';
+//       let billDate = 'N/A';
+//       let validity = 'N/A';
+//       let billExpiryDate = 'N/A';
+
+//       if (matchedBill) {
+//         adminOffice = matchedBill.adminOffice || 'N/A';
+//         adminName = matchedBill.adminName || 'N/A';
+//         billNo = matchedBill.billNo || 'N/A';
+//         billDate = matchedBill.billDate || 'N/A';
+//         validity = matchedBill.validity || 'N/A';
+
+//         if (billDate !== 'N/A' && validity !== 'N/A') {
+//           const billStart = new Date(billDate).getTime();
+//           const billExpiry = billStart + (validity * 24 * 60 * 60 * 1000);
+//           billExpiryDate = new Date(billExpiry).toLocaleDateString();
+//         }
+//       }
+
+//       // Plan dates
+//       let planCreatedAt = 'N/A';
+//       let planExpiryDate = 'N/A';
+
+//       if (matchedPlan && matchedPlan.createdAt && matchedPlan.durationDays) {
+//         const expiryDate = new Date(matchedPlan.createdAt).getTime() + matchedPlan.durationDays * 24 * 60 * 60 * 1000;
+//         planCreatedAt = new Date(matchedPlan.createdAt).toLocaleDateString();
+//         planExpiryDate = new Date(expiryDate).toLocaleDateString();
+//       }
+
+//       return {
+//         ...property._doc,
+//         required: isComplete ? "yes" : "no",
+//         adsCount: adsCountByUser[property.phoneNumber] || 0,
+//         planName: matchedPlan?.name || 'N/A',
+//         planCreatedAt,
+//         planExpiryDate,
+//         packageType: matchedPlan?.packageType || 'N/A',
+//         planDuration: matchedPlan?.durationDays || 'N/A',
+//         // ✅ Bill info
+//         adminOffice,
+//         adminName,
+//         billNo,
+//         billDate,
+//         validity,
+//         billExpiryDate
+//       };
+//     });
+
+//     res.status(200).json({
+//       message: "All user data with plan, bill info, and ads count fetched successfully!",
+//       users: processedProperties,
+//     });
+
+//   } catch (error) {
+//     console.error('Error fetching all user details:', error);
+//     res.status(500).json({
+//       message: 'Error fetching all user details.',
+//       error: error.message
+//     });
+//   }
+// });
+
+
+// router.get('/fetch-alls-datas', async (req, res) => {
+//   try {
+//     const properties = await AddModel.find({});
+//     const plans = await PricingPlans.find();
+
+//     const requiredFields = [
+//       'propertyMode', 'propertyType', 'price',
+//       'totalArea', 'areaUnit',
+//       'salesType', 'postedBy'
+//     ];
+
+//     const processedProperties = properties.map((property) => {
+//       const isComplete = requiredFields.every(
+//         (field) =>
+//           property[field] !== undefined &&
+//           property[field] !== null &&
+//           String(property[field]).trim() !== ''
+//       );
+
+//       // Match plan based on phoneNumber
+//       const matchedPlan = plans.find(plan =>
+//         Array.isArray(plan.phoneNumber)
+//           ? plan.phoneNumber.includes(property.phoneNumber)
+//           : plan.phoneNumber === property.phoneNumber
+//       );
+
+//       let planCreatedAt = 'N/A';
+//       let planExpiryDate = 'N/A';
+
+//       if (matchedPlan && matchedPlan.createdAt && matchedPlan.durationDays) {
+//         const expiryDate = new Date(matchedPlan.createdAt).getTime() + matchedPlan.durationDays * 24 * 60 * 60 * 1000;
+//         planCreatedAt = new Date(matchedPlan.createdAt).toLocaleDateString();
+//         planExpiryDate = new Date(expiryDate).toLocaleDateString();
+//       }
+
+//       return {
+//         ...property._doc,
+//         required: isComplete ? "yes" : "no",
+//         planName: matchedPlan?.name || 'N/A',
+//         planCreatedAt,
+//         planExpiryDate,
+//         packageType: matchedPlan?.packageType || 'N/A',
+//         planDuration: matchedPlan?.durationDays || 'N/A',
+//       };
+//     });
+
+//     res.status(200).json({
+//       message: "All user data with plan info fetched successfully!",
+//       users: processedProperties,
+//     });
+//   } catch (error) {
+//     console.error('Error fetching all user details:', error);
+//     res.status(500).json({
+//       message: 'Error fetching all user details.',
+//       error: error.message
+//     });
+//   }
+// });
+
+
+router.get('/ads-count-by-user', async (req, res) => {
+  try {
+    const properties = await AddModel.find({});
+    
+    const adsCountByUser = properties.reduce((acc, property) => {
+      const phone = property.phoneNumber;
+      if (!acc[phone]) {
+        acc[phone] = 1;
+      } else {
+        acc[phone]++;
+      }
+      return acc;
+    }, {});
+
+    const adsCountArray = Object.entries(adsCountByUser).map(([phoneNumber, adsCount]) => ({
+      phoneNumber,
+      adsCount,
+    }));
+
+    res.status(200).json({
+      message: 'Ad count per user fetched successfully!',
+      data: adsCountArray,
+    });
+  } catch (error) {
+    console.error('Error fetching ad count:', error);
+    res.status(500).json({
+      message: 'Failed to fetch ad counts',
+      error: error.message,
+    });
+  }
+});
+
 
 
 // Common function to fetch active users by postedBy type
@@ -2410,6 +3557,37 @@ router.get('/fetch-active-promotor', (req, res) => {
 
 
 
+
+// router.get('/fetch-free-plan-properties', async (req, res) => {
+//   try {
+//     // 1. Find all users who have Free Plan
+//     const freePlanUsers = await PricingPlans.find({ name: "Free" });
+
+//     if (!freePlanUsers.length) {
+//       return res.status(404).json({ message: 'No users found with Free Plan.' });
+//     }
+
+//     // 2. Extract phoneNumbers from Free Plan users (assuming phoneNumbers is an array)
+//     const phoneNumbers = freePlanUsers.flatMap(user => user.phoneNumber); // Flattening in case of an array
+
+//     // 3. Find properties posted by these phoneNumbers
+//     const properties = await AddModel.find({ phoneNumber: { $in: phoneNumbers } });
+
+//     res.status(200).json({
+//       message: "Properties posted by Free Plan users fetched successfully!",
+//       freePlanUsers: freePlanUsers, // plan user details
+//       properties: properties         // their posted properties
+//     });
+
+//   } catch (error) {
+//     console.error('Error fetching Free Plan user properties:', error);
+//     res.status(500).json({ message: 'Error fetching Free Plan user properties.', error: error.message });
+//   }
+// });
+
+// --------------------------------------------------------------------------
+
+
 router.get('/fetch-free-plan-properties', async (req, res) => {
   try {
     // 1. Find all users who have Free Plan
@@ -2454,6 +3632,7 @@ router.get('/fetch-free-plan-properties', async (req, res) => {
     });
     
   } catch (error) {
+    console.error('Error fetching Free Plan user properties:', error);
     res.status(500).json({ message: 'Error fetching Free Plan user properties.', error: error.message });
   }
 });
@@ -2517,6 +3696,7 @@ router.get('/fetch-plan-by-phone-number', async (req, res) => {
       properties: enhancedProperties,
     });
   } catch (error) {
+    console.error('Error fetching plan details:', error);
 
     // Handle server errors
     res.status(500).json({
@@ -2579,12 +3759,74 @@ router.get('/fetch-all-plans-and-properties', async (req, res) => {
       data: userPlansWithProperties,
     });
   } catch (error) {
+    console.error('Error fetching all plans and properties:', error);
     res.status(500).json({
       message: 'Error fetching all plans and properties.',
       error: error.message,
     });
   }
 });
+
+
+
+// router.get('/fetch-all-free-plans', async (req, res) => {
+//   try {
+//     const users = await PricingPlans.find({ name: 'Free' }); // Fetch only Free plans
+
+//     if (!users.length) {
+//       return res.status(404).json({ message: 'No users with Free plan found.' });
+//     }
+
+//     const userPlansWithProperties = await Promise.all(users.map(async (user) => {
+//       const { name: planName, phoneNumber, createdAt, durationDays, packageType } = user;
+
+//       const planExpiryDate = createdAt && durationDays
+//         ? new Date(new Date(createdAt).getTime() + durationDays * 24 * 60 * 60 * 1000)
+//         : null;
+
+//       const formattedCreatedAt = createdAt ? new Date(createdAt).toLocaleDateString() : 'N/A';
+//       const formattedExpiryDate = planExpiryDate ? new Date(planExpiryDate).toLocaleDateString() : 'N/A';
+
+//       // Fetch only active properties associated with this user's phone number(s)
+//       const properties = await AddModel.find({
+//         phoneNumber: { $in: phoneNumber },
+//         // status: 'active'
+//       });
+
+//       const enhancedProperties = properties.map((property) => ({
+//         ...property.toObject(),
+//         planName,
+//         planCreatedAt: formattedCreatedAt,
+//         durationDays,
+//         planExpiryDate: formattedExpiryDate,
+//         packageType: packageType || 'N/A',
+//       }));
+
+//       return {
+//         user: {
+//           phoneNumber,
+//           planName,
+//           planCreatedAt: formattedCreatedAt,
+//           durationDays,
+//           planExpiryDate: formattedExpiryDate,
+//           packageType,
+//         },
+//         properties: enhancedProperties,
+//       };
+//     }));
+
+//     res.status(200).json({
+//       message: "Free plan's active properties and user plans fetched successfully!",
+//       data: userPlansWithProperties,
+//     });
+//   } catch (error) {
+//     console.error('Error fetching Free plans and properties:', error);
+//     res.status(500).json({
+//       message: 'Error fetching Free plans and properties.',
+//       error: error.message,
+//     });
+//   }
+// });
 
 
 
@@ -2597,7 +3839,16 @@ router.get('/fetch-all-free-plans', async (req, res) => {
     }
 
     const userPlansWithProperties = await Promise.all(users.map(async (user) => {
-      const { name: planName, phoneNumber, createdAt, durationDays, packageType } = user;
+      const {
+        name: planName,
+        phoneNumber,
+        createdAt,
+        durationDays,
+        packageType,
+        adminName,
+        billNo,
+        createdBy, // Assuming this is billCreatedBy
+      } = user;
 
       const planExpiryDate = createdAt && durationDays
         ? new Date(new Date(createdAt).getTime() + durationDays * 24 * 60 * 60 * 1000)
@@ -2606,39 +3857,62 @@ router.get('/fetch-all-free-plans', async (req, res) => {
       const formattedCreatedAt = createdAt ? new Date(createdAt).toLocaleDateString() : 'N/A';
       const formattedExpiryDate = planExpiryDate ? new Date(planExpiryDate).toLocaleDateString() : 'N/A';
 
-      // Fetch only active properties associated with this user's phone number(s)
+      // Fetch all properties associated with this user's phone number(s)
       const properties = await AddModel.find({
         phoneNumber: { $in: phoneNumber },
-        status: 'active'
       });
 
-      const enhancedProperties = properties.map((property) => ({
-        ...property.toObject(),
-        planName,
-        planCreatedAt: formattedCreatedAt,
-        durationDays,
-        planExpiryDate: formattedExpiryDate,
-        packageType: packageType || 'N/A',
-      }));
+      const requiredFields = ['propertyMode', 'propertyType', 'price', 'totalArea', 'areaUnit', 'salesType', 'postedBy'];
+
+      const enhancedProperties = properties
+      .map((property) => {
+        const hasRequiredFields = requiredFields.every(field =>
+          property[field] !== undefined &&
+          property[field] !== null &&
+          String(property[field]).trim() !== ''
+        );
+    
+        return {
+          ...property.toObject(),
+          planName,
+          planCreatedAt: formattedCreatedAt,
+          durationDays,
+          planExpiryDate: formattedExpiryDate,
+          packageType: packageType || 'N/A',
+          adminName:adminName || 'N/A',
+          billNo: billNo || 'N/A',
+          billCreatedBy: createdBy || 'N/A',
+          billCreatedAt: formattedCreatedAt,
+          required: hasRequiredFields ? 'Yes' : 'No',
+        };
+      })
+      .filter(property => property.required === 'Yes'); // ✅ Filter only 'Yes'
+    
 
       return {
         user: {
           phoneNumber,
           planName,
           planCreatedAt: formattedCreatedAt,
-          durationDays,
           planExpiryDate: formattedExpiryDate,
+          durationDays,
           packageType,
+          adminName:adminName || 'N/A',
+          billNo: billNo || 'N/A',
+          billCreatedBy: createdBy || 'N/A',
+          billCreatedAt: formattedCreatedAt,
+          adsCount: properties.length,
         },
         properties: enhancedProperties,
       };
     }));
 
     res.status(200).json({
-      message: "Free plan's active properties and user plans fetched successfully!",
+      message: "Free plan's properties and full user details fetched successfully!",
       data: userPlansWithProperties,
     });
   } catch (error) {
+    console.error('Error fetching Free plans and properties:', error);
     res.status(500).json({
       message: 'Error fetching Free plans and properties.',
       error: error.message,
@@ -2646,6 +3920,359 @@ router.get('/fetch-all-free-plans', async (req, res) => {
   }
 });
 
+
+
+router.get('/fetch-all-featured-properties', async (req, res) => {
+  try {
+    const featuredProperties = await AddModel.find({ featureStatus: 'yes' });
+
+    if (!featuredProperties.length) {
+      return res.status(404).json({ message: 'No featured properties found.' });
+    }
+
+    const requiredFields = ['propertyMode', 'propertyType', 'price', 'totalArea', 'areaUnit', 'salesType', 'postedBy'];
+
+    const result = await Promise.all(featuredProperties.map(async (property) => {
+      const hasRequiredFields = requiredFields.every(field =>
+        property[field] !== undefined &&
+        property[field] !== null &&
+        String(property[field]).trim() !== ''
+      );
+
+      if (!hasRequiredFields) return null; // Skip if not required
+
+      // Try to find plan for this property's phoneNumber
+      const plan = await PricingPlans.findOne({ phoneNumber: property.phoneNumber });
+
+      const planName = plan?.name || 'N/A';
+      const createdAt = plan?.createdAt || null;
+      const durationDays = plan?.durationDays || null;
+      const planExpiryDate = createdAt && durationDays
+        ? new Date(new Date(createdAt).getTime() + durationDays * 24 * 60 * 60 * 1000)
+        : null;
+
+      return {
+        user: {
+          phoneNumber: property.phoneNumber,
+          planName,
+          planCreatedAt: createdAt ? new Date(createdAt).toLocaleDateString() : 'N/A',
+          planExpiryDate: planExpiryDate ? new Date(planExpiryDate).toLocaleDateString() : 'N/A',
+          durationDays: durationDays || 'N/A',
+          packageType: plan?.packageType || 'N/A',
+          adminName:plan?.adminName || 'N/A',
+          billNo: plan?.billNo || 'N/A',
+          billCreatedBy: plan?.createdBy || 'N/A',
+          billCreatedAt: createdAt ? new Date(createdAt).toLocaleDateString() : 'N/A',
+          adsCount: 1,
+        },
+        properties: [{
+          ...property.toObject(),
+          required: 'Yes',
+          planName,
+        }]
+      };
+    }));
+
+    const filteredResult = result.filter(item => item !== null);
+
+    res.status(200).json({
+      message: "Featured properties with user and plan info fetched successfully!",
+      data: filteredResult,
+    });
+  } catch (error) {
+    console.error('Error fetching featured properties:', error);
+    res.status(500).json({
+      message: 'Error fetching featured properties.',
+      error: error.message,
+    });
+  }
+});
+
+
+
+router.get('/fetch-all-ppc-properties', async (req, res) => {
+  try {
+    const featuredProperties = await AddModel.find({ featureStatus: 'yes' });
+
+    if (!featuredProperties.length) {
+      return res.status(404).json({ message: 'No featured properties found.' });
+    }
+
+    const requiredFields = ['propertyMode', 'propertyType', 'price', 'totalArea', 'areaUnit', 'salesType', 'postedBy'];
+
+    const result = await Promise.all(featuredProperties.map(async (property) => {
+      const hasRequiredFields = requiredFields.every(field =>
+        property[field] !== undefined &&
+        property[field] !== null &&
+        String(property[field]).trim() !== ''
+      );
+
+      if (!hasRequiredFields) return null; // Skip if not required
+
+      // Try to find plan for this property's phoneNumber
+      const plan = await PricingPlans.findOne({ phoneNumber: property.phoneNumber });
+
+      const planName = plan?.name || 'N/A';
+      const createdAt = plan?.createdAt || null;
+      const durationDays = plan?.durationDays || null;
+      const planExpiryDate = createdAt && durationDays
+        ? new Date(new Date(createdAt).getTime() + durationDays * 24 * 60 * 60 * 1000)
+        : null;
+
+      return {
+        user: {
+          phoneNumber: property.phoneNumber,
+          planName,
+          planCreatedAt: createdAt ? new Date(createdAt).toLocaleDateString() : 'N/A',
+          planExpiryDate: planExpiryDate ? new Date(planExpiryDate).toLocaleDateString() : 'N/A',
+          durationDays: durationDays || 'N/A',
+          packageType: plan?.packageType || 'N/A',
+          adminName:plan?.adminName || 'N/A',
+          billNo: plan?.billNo || 'N/A',
+          billCreatedBy: plan?.createdBy || 'N/A',
+          billCreatedAt: createdAt ? new Date(createdAt).toLocaleDateString() : 'N/A',
+          adsCount: 1,
+        },
+        properties: [{
+          ...property.toObject(),
+          required: 'Yes',
+          planName,
+        }]
+      };
+    }));
+
+    const filteredResult = result.filter(item => item !== null);
+
+    res.status(200).json({
+      message: "Featured properties with user and plan info fetched successfully!",
+      data: filteredResult,
+    });
+  } catch (error) {
+    console.error('Error fetching featured properties:', error);
+    res.status(500).json({
+      message: 'Error fetching featured properties.',
+      error: error.message,
+    });
+  }
+});
+
+
+
+
+router.get('/fetch-all-paid-plans', async (req, res) => {
+  try {
+    // Fetch all plans that are NOT 'Free'
+    const users = await PricingPlans.find({ name: { $ne: 'Free' } }); // Only paid plans
+
+    if (!users.length) {
+      return res.status(404).json({ message: 'No users with Paid plans found.' });
+    }
+
+    const userPlansWithProperties = await Promise.all(users.map(async (user) => {
+      const {
+        name: planName,
+        phoneNumber,
+        createdAt,
+        durationDays,
+        packageType,
+        adminName,
+        billNo,
+        createdBy,
+      } = user;
+
+      const planExpiryDate = createdAt && durationDays
+        ? new Date(new Date(createdAt).getTime() + durationDays * 24 * 60 * 60 * 1000)
+        : null;
+
+      const formattedCreatedAt = createdAt ? new Date(createdAt).toLocaleDateString() : 'N/A';
+      const formattedExpiryDate = planExpiryDate ? new Date(planExpiryDate).toLocaleDateString() : 'N/A';
+
+      const properties = await AddModel.find({
+        phoneNumber: { $in: phoneNumber },
+      });
+
+      const requiredFields = ['propertyMode', 'propertyType', 'price', 'totalArea', 'areaUnit', 'salesType', 'postedBy'];
+ 
+      const enhancedProperties = properties
+      .map((property) => {
+        const hasRequiredFields = requiredFields.every(field =>
+          property[field] !== undefined &&
+          property[field] !== null &&
+          String(property[field]).trim() !== ''
+        );
+    
+        return {
+          ...property.toObject(),
+          planName,
+          planCreatedAt: formattedCreatedAt,
+          durationDays,
+          planExpiryDate: formattedExpiryDate,
+          packageType: packageType || 'N/A',
+          adminName:adminName || 'N/A',
+          billNo: billNo || 'N/A',
+          billCreatedBy: createdBy || 'N/A',
+          billCreatedAt: formattedCreatedAt,
+          required: hasRequiredFields ? 'Yes' : 'No',
+        };
+      })
+      .filter(property => property.required === 'Yes'); // ✅ Filter only 'Yes'
+    
+      
+      
+      return {
+        user: {
+          phoneNumber,
+          planName,
+          planCreatedAt: formattedCreatedAt,
+          planExpiryDate: formattedExpiryDate,
+          durationDays,
+          packageType,
+          adminName:adminName || 'N/A',
+          billNo: billNo || 'N/A',
+          billCreatedBy: createdBy || 'N/A',
+          billCreatedAt: formattedCreatedAt,
+          adsCount: properties.length,
+        },
+        properties: enhancedProperties,
+      };
+    }));
+
+    res.status(200).json({
+      message: "Paid plan properties and user details fetched successfully!",
+      data: userPlansWithProperties,
+    });
+  } catch (error) {
+    console.error('Error fetching Paid plans and properties:', error);
+    res.status(500).json({
+      message: 'Error fetching Paid plans and properties.',
+      error: error.message,
+    });
+  }
+});
+
+
+
+// PUT /delete-free-property/:ppcId
+router.put('/delete-free-property/:ppcId', async (req, res) => {
+  try {
+    const { ppcId } = req.params;
+    const property = await AddModel.findOneAndUpdate(
+      { ppcId },
+      { isDeleted: true },
+      { new: true }
+    );
+
+    if (!property) {
+      return res.status(404).json({ message: 'Property not found with the given PPC ID' });
+    }
+
+    res.status(200).json({ message: 'Property marked as deleted successfully', property });
+  } catch (error) {
+    console.error('Error deleting property:', error);
+    res.status(500).json({ message: 'Internal server error', error: error.message });
+  }
+});
+
+
+// PUT /undo-delete-free-property/:ppcId
+router.put('/undo-delete-free-property/:ppcId', async (req, res) => {
+  try {
+    const { ppcId } = req.params;
+    const property = await AddModel.findOneAndUpdate(
+      { ppcId },
+      { isDeleted: false },
+      { new: true }
+    );
+
+    if (!property) {
+      return res.status(404).json({ message: 'Property not found with the given PPC ID' });
+    }
+
+    res.status(200).json({ message: 'Property restored successfully', property });
+  } catch (error) {
+    console.error('Error restoring property:', error);
+    res.status(500).json({ message: 'Internal server error', error: error.message });
+  }
+});
+
+
+
+// router.get('/fetch-all-plans-and-properties', async (req, res) => {
+//   try {
+//     // 1. Fetch all users from PricingPlans
+//     const users = await PricingPlans.find();
+
+//     // Check if any users exist
+//     if (!users.length) {
+//       return res.status(404).json({ message: 'No users found.' });
+//     }
+
+//     // Map through users to enhance their plan details and fetch associated properties
+//     const userPlansWithProperties = await Promise.all(users.map(async (user) => {
+//       const { name: planName, phoneNumber, createdAt, durationDays, packageType } = user;
+
+//       // Calculate plan expiry date
+//       const planExpiryDate = createdAt && durationDays
+//         ? new Date(new Date(createdAt).getTime() + durationDays * 24 * 60 * 60 * 1000) // Adds durationDays in milliseconds
+//         : null;
+
+//       // Format dates for display
+//       const formattedCreatedAt = createdAt ? new Date(createdAt).toLocaleDateString() : 'N/A';
+//       const formattedExpiryDate = planExpiryDate ? new Date(planExpiryDate).toLocaleDateString() : 'N/A';
+
+//       // Fetch properties associated with this user's phone number(s)
+//       const properties = await AddModel.find({ phoneNumber: { $in: phoneNumber } });
+
+//       // Enhance properties with plan information
+//       const enhancedProperties = properties.map((property) => ({
+//         ...property.toObject(),
+//         planName,
+//         planCreatedAt: formattedCreatedAt,
+//         durationDays,
+//         planExpiryDate: formattedExpiryDate,
+//         packageType: packageType || 'N/A',
+//       }));
+
+//       // Return user plan details along with their properties
+//       return {
+//         user: {
+//           phoneNumber,
+//           planName,
+//           planCreatedAt: formattedCreatedAt,
+//           durationDays,
+//           planExpiryDate: formattedExpiryDate,
+//           packageType,
+//         },
+//         properties: enhancedProperties,
+//       };
+//     }));
+
+//     // Send success response
+//     res.status(200).json({
+//       message: "All user plans and their associated properties fetched successfully!",
+//       data: userPlansWithProperties,
+//     });
+//   } catch (error) {
+//     console.error('Error fetching all plans and properties:', error);
+
+//     // Handle server errors
+//     res.status(500).json({
+//       message: 'Error fetching all plans and properties.',
+//       error: error.message,
+//     });
+//   }
+// });
+
+
+
+
+
+
+
+
+
+
+// ------------------------------------------------------------------
 
 
 router.get('/fetch-all-datas', async (req, res) => {
@@ -2664,6 +4291,28 @@ router.get('/fetch-all-datas', async (req, res) => {
 
 
 
+// // router.get('/fetch-all-datas', async (req, res) => {
+//   try {
+//     // Delete all "incomplete" entries from DB
+//     await AddModel.deleteMany({ status: 'incomplete' });
+
+//     // Fetch only "complete" entries
+//     const users = await AddModel.find({ status: 'complete' });
+
+//     res.status(200).json({
+//       message: 'Only complete user data fetched successfully!',
+//       users
+//     });
+//   } catch (error) {
+//     res.status(500).json({
+//       message: 'Error fetching user data.',
+//       error
+//     });
+//   }
+// });
+
+
+// API to fetch distinct states from AddModel
 router.get("/fetch-states", async (req, res) => {
   try {
     const states = await AddModel.distinct("state"); // Fetch unique state values
@@ -2690,6 +4339,25 @@ router.get("/fetch-all-properties", async (req, res) => {
   }
 });
 
+// // Fetch properties from Puducherry (Case-Insensitive)
+// router.get("/fetch-Pudhucherry-properties", async (req, res) => {
+//   try {
+//     const pondicherryData = await AddModel.find({ 
+//       state: { $regex: /^puducherry$/i }  // Case-insensitive match
+//     });
+
+//     if (pondicherryData.length === 0) {
+//       return res.status(404).json({ success: false, message: "No data found for Puducherry" });
+//     }
+
+//     res.json({ success: true, data: pondicherryData });
+//   } catch (error) {
+//     res.status(500).json({ success: false, message: "Server error", error });
+//   }
+// });
+
+
+// Fetch properties from all Puducherry variants (case-insensitive)
 router.get("/fetch-Pudhucherry-properties", async (req, res) => {
   try {
     const pondicherryData = await AddModel.find({
@@ -2709,28 +4377,310 @@ router.get("/fetch-Pudhucherry-properties", async (req, res) => {
 });
 
 
-// Route: GET /fetch-active-users
+// // Route: GET /fetch-active-users
+// router.get('/fetch-active-users', async (req, res) => {
+//   try {
+//     // Fetch users with specific statuses
+//     const users = await AddModel.find({
+//       status: { $in: ['active'] }
+//     });
+
+//     // Respond with the fetched users
+//     res.status(200).json({
+//       message: 'Active and related status users fetched successfully!',
+//       users
+//     });
+
+//   } catch (error) {
+
+//     res.status(500).json({
+//       message: 'Error fetching users.',
+//       error: error.message || 'Unknown server error'
+//     });
+//   }
+// });
+
+
+
 router.get('/fetch-active-users', async (req, res) => {
   try {
-    // Fetch users with specific statuses
-    const users = await AddModel.find({
-      status: { $in: ['active'] }
-    });
+    const properties = await AddModel.find({ status: 'active' });
+    const plans = await PricingPlans.find();
+    const bills = await Bill.find();
+    const followups = await FollowUp.find(); // Ensure you're getting follow-ups
 
-    // Respond with the fetched users
+    const requiredFields = [
+      'propertyMode', 'propertyType', 'price',
+      'totalArea', 'areaUnit',
+      'salesType', 'postedBy'
+    ];
+
+    const processedProperties = properties.map((property) => {
+      const isComplete = requiredFields.every(
+        (field) =>
+          property[field] !== undefined &&
+          property[field] !== null &&
+          String(property[field]).trim() !== ''
+      );
+
+      // Match plan based on phoneNumber
+      const matchedPlan = plans.find(plan =>
+        Array.isArray(plan.phoneNumber)
+          ? plan.phoneNumber.includes(property.phoneNumber)
+          : plan.phoneNumber === property.phoneNumber
+      );
+
+      let planCreatedAt = 'N/A';
+      let planExpiryDate = 'N/A';
+
+      if (matchedPlan && matchedPlan.createdAt && matchedPlan.durationDays) {
+        const expiryDate = new Date(matchedPlan.createdAt).getTime() + matchedPlan.durationDays * 24 * 60 * 60 * 1000;
+        planCreatedAt = new Date(matchedPlan.createdAt).toLocaleDateString();
+        planExpiryDate = new Date(expiryDate).toLocaleDateString();
+      }
+
+      // Match bill based on phone number or ppId
+      const matchedBill = bills.find(bill =>
+        bill.ownerPhone === property.phoneNumber || bill.ppId === property.ppcId
+      );
+
+      let adminName = 'N/A';
+      let billDate = 'N/A';
+      let validity = 'N/A';
+      let billExpiryDate = 'N/A';
+
+      if (matchedBill) {
+        adminName = matchedBill.adminName || 'N/A';
+        billDate = matchedBill.billDate || 'N/A';
+        validity = matchedBill.validity || 'N/A';
+
+        if (billDate !== 'N/A' && validity !== 'N/A') {
+          const billStart = new Date(billDate).getTime();
+          const billExpiry = billStart + (validity * 24 * 60 * 60 * 1000);
+          billExpiryDate = new Date(billExpiry).toLocaleDateString();
+        }
+      }
+
+    
+      // Get the latest follow-up admin name for this ppcId
+      const propertyFollowUps = followups
+        .filter(fu => String(fu.ppcId) === String(property.ppcId)) // Ensure matching ppcId
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+   const followUpAdminName = propertyFollowUps.length > 0 
+   ? propertyFollowUps[0]?.adminName || 'Unknown Admin' 
+   : 'N/A';
+
+    //   console.log('FollowUp Admin Name:', followUpAdminName);
+
+    //   return {
+    //     ...property._doc,
+    //     required: isComplete ? "yes" : "no",
+    //     planName: matchedPlan?.name || 'N/A',
+    //     planCreatedAt,
+    //     planExpiryDate,
+    //     packageType: matchedPlan?.packageType || 'N/A',
+    //     planDuration: matchedPlan?.durationDays || 'N/A',
+    //     adminName,
+    //     billDate,
+    //     validity,
+    //     billExpiryDate,
+    //     followUpAdminName: adminName || 'N/A', // Ensure this is added correctly
+    //   };
+    // });
+   
+    
+    return {
+      ...property._doc,
+      required: isComplete ? "yes" : "no",
+      planName: matchedPlan?.name || 'N/A',
+      planCreatedAt,
+      planExpiryDate,
+      packageType: matchedPlan?.packageType || 'N/A',
+      planDuration: matchedPlan?.durationDays || 'N/A',
+      adminName,
+      billDate,
+      validity,
+      billExpiryDate,
+      followUpAdminName, // Ensure this is added correctly
+    };
+     });
+
+    // Only return required = "yes"
+    const filteredProperties = processedProperties.filter(p => p.required === "yes");
+
     res.status(200).json({
-      message: 'Active and related status users fetched successfully!',
-      users
+      message: 'Active properties with complete plan and bill info fetched successfully!',
+      users: filteredProperties,
     });
-
   } catch (error) {
-
+    console.error('Error fetching active user details:', error);
     res.status(500).json({
-      message: 'Error fetching users.',
-      error: error.message || 'Unknown server error'
+      message: 'Error fetching active user details.',
+      error: error.message
     });
   }
 });
+
+
+
+// ---------this--------------------------------
+// router.get('/fetch-active-users', async (req, res) => {
+//   try {
+//     const properties = await AddModel.find({ status: 'active' });
+//     const plans = await PricingPlans.find();
+//     const bills = await Bill.find();
+
+//     const requiredFields = [
+//       'propertyMode', 'propertyType', 'price',
+//       'totalArea', 'areaUnit',
+//       'salesType', 'postedBy'
+//     ];
+
+//     const processedProperties = properties.map((property) => {
+//       const isComplete = requiredFields.every(
+//         (field) =>
+//           property[field] !== undefined &&
+//           property[field] !== null &&
+//           String(property[field]).trim() !== ''
+//       );
+
+//       // Match plan based on phoneNumber
+//       const matchedPlan = plans.find(plan =>
+//         Array.isArray(plan.phoneNumber)
+//           ? plan.phoneNumber.includes(property.phoneNumber)
+//           : plan.phoneNumber === property.phoneNumber
+//       );
+
+//       let planCreatedAt = 'N/A';
+//       let planExpiryDate = 'N/A';
+
+//       if (matchedPlan && matchedPlan.createdAt && matchedPlan.durationDays) {
+//         const expiryDate = new Date(matchedPlan.createdAt).getTime() + matchedPlan.durationDays * 24 * 60 * 60 * 1000;
+//         planCreatedAt = new Date(matchedPlan.createdAt).toLocaleDateString();
+//         planExpiryDate = new Date(expiryDate).toLocaleDateString();
+//       }
+
+//       // Match bill based on phone number or ppId
+//       const matchedBill = bills.find(bill =>
+//         bill.ownerPhone === property.phoneNumber || bill.ppId === property.ppcId
+//       );
+
+//       let adminName = 'N/A';
+//       let billDate = 'N/A';
+//       let validity = 'N/A';
+//       let billExpiryDate = 'N/A';
+
+//       if (matchedBill) {
+//         adminName = matchedBill.adminName || 'N/A';
+//         billDate = matchedBill.billDate || 'N/A';
+//         validity = matchedBill.validity || 'N/A';
+
+//         if (billDate !== 'N/A' && validity !== 'N/A') {
+//           const billStart = new Date(billDate).getTime();
+//           const billExpiry = billStart + (validity * 24 * 60 * 60 * 1000);
+//           billExpiryDate = new Date(billExpiry).toLocaleDateString();
+//         }
+//       }
+
+//       return {
+//         ...property._doc,
+//         required: isComplete ? "yes" : "no",
+//         planName: matchedPlan?.name || 'N/A',
+//         planCreatedAt,
+//         planExpiryDate,
+//         packageType: matchedPlan?.packageType || 'N/A',
+//         planDuration: matchedPlan?.durationDays || 'N/A',
+//         adminName,
+//         billDate,
+//         validity,
+//         billExpiryDate
+//       };
+//     });
+
+//     // Only return required = "yes"
+//     const filteredProperties = processedProperties.filter(p => p.required === "yes");
+
+//     res.status(200).json({
+//       message: 'Active properties with complete plan and bill info fetched successfully!',
+//       users: filteredProperties,
+//     });
+//   } catch (error) {
+//     console.error('Error fetching active user details:', error);
+//     res.status(500).json({
+//       message: 'Error fetching active user details.',
+//       error: error.message
+//     });
+//   }
+// });
+
+
+// ---------------------------------------------------------
+// router.get('/fetch-active-users', async (req, res) => {
+//   try {
+//     // Fetch active users
+//     const properties = await AddModel.find({ status: 'active' });
+//     const plans = await PricingPlans.find();
+
+//     const requiredFields = [
+//       'propertyMode', 'propertyType', 'price',
+//       'totalArea', 'areaUnit',
+//       'salesType', 'postedBy'
+//     ];
+
+//     const processedProperties = properties.map((property) => {
+//       const isComplete = requiredFields.every(
+//         (field) =>
+//           property[field] !== undefined &&
+//           property[field] !== null &&
+//           String(property[field]).trim() !== ''
+//       );
+
+//       // Match plan based on phoneNumber
+//       const matchedPlan = plans.find(plan =>
+//         Array.isArray(plan.phoneNumber)
+//           ? plan.phoneNumber.includes(property.phoneNumber)
+//           : plan.phoneNumber === property.phoneNumber
+//       );
+
+//       let planCreatedAt = 'N/A';
+//       let planExpiryDate = 'N/A';
+
+//       if (matchedPlan && matchedPlan.createdAt && matchedPlan.durationDays) {
+//         const expiryDate = new Date(matchedPlan.createdAt).getTime() + matchedPlan.durationDays * 24 * 60 * 60 * 1000;
+//         planCreatedAt = new Date(matchedPlan.createdAt).toLocaleDateString();
+//         planExpiryDate = new Date(expiryDate).toLocaleDateString();
+//       }
+
+//       return {
+//         ...property._doc,
+//         required: isComplete ? "yes" : "no",
+//         planName: matchedPlan?.name || 'N/A',
+//         planCreatedAt,
+//         planExpiryDate,
+//         packageType: matchedPlan?.packageType || 'N/A',
+//         planDuration: matchedPlan?.durationDays || 'N/A',
+//       };
+//     });
+
+//     // Filter only those with 'required' set to 'yes'
+//     const filteredProperties = processedProperties.filter(property => property.required === "yes");
+
+//     res.status(200).json({
+//       message: 'Active properties with complete plan info fetched successfully!',
+//       users: filteredProperties,
+//     });
+//   } catch (error) {
+//     console.error('Error fetching active user details:', error);
+//     res.status(500).json({
+//       message: 'Error fetching active user details.',
+//       error: error.message
+//     });
+//   }
+// });
+
+
+
 
 router.get('/fetch-all-complete-data', async (req, res) => {
   try {
@@ -2805,6 +4755,7 @@ router.delete('/delete-ppcId-data', async (req, res) => {
 
     res.status(200).json({ message: 'User Permenent deleted successfully!', deletedUser: userToDelete });
   } catch (error) {
+    console.error("Delete error:", error);
     res.status(500).json({ message: 'Error deleting user.', error });
   }
 });
@@ -2862,7 +4813,7 @@ router.put('/delete-datas', async (req, res) => {
       // Update status instead of deleting the record
       const updatedUser = await AddModel.findOneAndUpdate(
           query,
-          { status: "delete" }, 
+          { status: "delete", deletedBy: "Admin" }, 
           { new: true }
       );
 
@@ -3010,6 +4961,7 @@ router.post('/delete-property', async (req, res) => {
   
       // Change the property status to 'delete'
       property.status = 'delete';
+      property.deletedBy = 'User'; 
       await property.save();
   
       // Send the updated property as a response
@@ -3026,6 +4978,7 @@ router.delete('/delete-all-properties', async (req, res) => {
     const result = await AddModel.deleteMany({}); // Deletes all documents in the collection
     res.status(200).json({ message: 'All properties deleted successfully.', deletedCount: result.deletedCount });
   } catch (error) {
+    console.error('Error deleting all properties:', error);
     res.status(500).json({ message: 'Error deleting all properties.' });
   }
 });
@@ -3291,29 +5244,128 @@ router.put("/update-feature-status", async (req, res) => {
   }
 });
 
-router.get("/fetch-featured-properties", async (req, res) => {
-  try {
-    const featuredProperties = await AddModel.find({ featureStatus: "yes" });
+// router.get("/fetch-featured-properties", async (req, res) => {
+//   try {
+//     const featuredProperties = await AddModel.find({ featureStatus: "yes" });
 
-    res.status(200).json({
-      message: "Featured properties fetched successfully!",
-      properties: featuredProperties,
-    });
-  } catch (error) {
-    res.status(500).json({ message: "Error fetching featured properties.", error });
-  }
-});
+//     res.status(200).json({
+//       message: "Featured properties fetched successfully!",
+//       properties: featuredProperties,
+//     });
+//   } catch (error) {
+//     res.status(500).json({ message: "Error fetching featured properties.", error });
+//   }
+// });
+
+
+// router.get('/properties/deleted', async (req, res) => {
+//   try {
+//     const deletedProperties = await AddModel.find({ status: 'delete' });
+
+//     res.status(200).json({
+//       message: 'Deleted properties fetched successfully.',
+//       data: deletedProperties,
+//     });
+//   } catch (error) {
+//     res.status(500).json({
+//       message: 'Error fetching deleted properties.',
+//       error: error.message,
+//     });
+//   }
+// });
+
 
 
 router.get('/properties/deleted', async (req, res) => {
   try {
     const deletedProperties = await AddModel.find({ status: 'delete' });
+    const plans = await PricingPlans.find();
+    const bills = await Bill.find();
+
+    const processedDeleted = await Promise.all(deletedProperties.map(async property => {
+      const matchedPlan = plans.find(plan =>
+        Array.isArray(plan.phoneNumber)
+          ? plan.phoneNumber.includes(property.phoneNumber)
+          : plan.phoneNumber === property.phoneNumber
+      );
+
+      let planCreatedAt = 'N/A';
+      let planExpiryDate = 'N/A';
+
+      if (matchedPlan?.createdAt && matchedPlan?.durationDays) {
+        const expiry = new Date(matchedPlan.createdAt).getTime() + matchedPlan.durationDays * 24 * 60 * 60 * 1000;
+        planCreatedAt = new Date(matchedPlan.createdAt).toLocaleDateString();
+        planExpiryDate = new Date(expiry).toLocaleDateString();
+      }
+
+      const matchedBill = bills.find(bill =>
+        bill.ownerPhone === property.phoneNumber || bill.ppId === property.ppcId
+      );
+
+      let adminOffice = 'N/A';
+      let adminName = 'N/A';
+      let billNo = 'N/A';
+      let billDate = 'N/A';
+      let validity = 'N/A';
+      let billExpiryDate = 'N/A';
+
+      if (matchedBill) {
+        adminOffice = matchedBill.adminOffice || 'N/A';
+        adminName = matchedBill.adminName || 'N/A';
+        billNo = matchedBill.billNo || 'N/A';
+        billDate = matchedBill.billDate || 'N/A';
+        validity = matchedBill.validity || 'N/A';
+
+        if (billDate !== 'N/A' && validity !== 'N/A') {
+          const billStart = new Date(billDate).getTime();
+          const billExp = billStart + validity * 24 * 60 * 60 * 1000;
+          billExpiryDate = new Date(billExp).toLocaleDateString();
+        }
+      }
+
+      // ✅ Calculate total number of ads posted by this phoneNumber
+      const adsCount = await AddModel.countDocuments({
+        phoneNumber: property.phoneNumber,
+        status: { $ne: 'delete' }
+      });
+
+      // ✅ Check required fields
+      const requiredFields = [
+        'propertyMode', 'propertyType', 'price',
+        'totalArea', 'areaUnit',
+        'salesType', 'postedBy'
+      ];
+
+      const required = requiredFields.every(field => property[field] !== undefined && property[field] !== null && property[field] !== '')
+        ? 'Yes'
+        : 'No';
+
+      return {
+        ...property._doc,
+        planName: matchedPlan?.name || 'N/A',
+        planCreatedAt,
+        planExpiryDate,
+        packageType: matchedPlan?.packageType || 'N/A',
+        planDuration: matchedPlan?.durationDays || 'N/A',
+        adminOffice,
+        adminName,
+        billNo,
+        billDate,
+        validity,
+        billExpiryDate,
+        adsCount,
+        required, 
+  //        deletedBy: property.deletedBy || 'User',
+  // deletedAt: property.deletedAt ? new Date(property.deletedAt).toLocaleDateString() : 'N/A'
+      };
+    }));
 
     res.status(200).json({
       message: 'Deleted properties fetched successfully.',
-      data: deletedProperties,
+      data: processedDeleted,
     });
   } catch (error) {
+    console.error('Error fetching deleted properties:', error);
     res.status(500).json({
       message: 'Error fetching deleted properties.',
       error: error.message,
@@ -3321,21 +5373,370 @@ router.get('/properties/deleted', async (req, res) => {
   }
 });
 
+
+
+// router.get('/properties/pending', async (req, res) => {
+//   try {
+//     const pendingProperties = await AddModel.find({ status: 'incomplete' });
+
+//     res.status(200).json({
+//       message: 'Pending properties fetched successfully.',
+//       data: pendingProperties,
+//     });
+//   } catch (error) {
+//     res.status(500).json({
+//       message: 'Error fetching pending properties.',
+//       error: error.message,
+//     });
+//   }
+// });
+
+
 router.get('/properties/pending', async (req, res) => {
   try {
-    const pendingProperties = await AddModel.find({ status: 'pending' });
+    const users = await AddModel.find({ status: 'incomplete' });
+    const plans = await PricingPlans.find();
+
+    // ✅ Step 1: Calculate ads count per phone number across all properties
+    const allProperties = await AddModel.find({});
+    const adsCountByUser = allProperties.reduce((acc, property) => {
+      const phone = property.phoneNumber;
+      if (!acc[phone]) {
+        acc[phone] = 1;
+      } else {
+        acc[phone]++;
+      }
+      return acc;
+    }, {});
+
+    const requiredFields = [
+      'propertyMode', 'propertyType', 'price',
+      'totalArea', 'areaUnit',
+      'salesType', 'postedBy'
+    ];
+
+    const incompleteUsers = users.map((user) => {
+      const isComplete = requiredFields.every(
+        (field) =>
+          user[field] !== undefined &&
+          user[field] !== null &&
+          String(user[field]).trim() !== ''
+      );
+
+      // Match plan
+      const matchedPlan = plans.find(plan =>
+        Array.isArray(plan.phoneNumber)
+          ? plan.phoneNumber.includes(user.phoneNumber)
+          : plan.phoneNumber === user.phoneNumber
+      );
+
+      let planCreatedAt = 'N/A';
+      let planExpiryDate = 'N/A';
+
+      if (matchedPlan && matchedPlan.createdAt && matchedPlan.durationDays) {
+        const expiryDate = new Date(matchedPlan.createdAt).getTime() + matchedPlan.durationDays * 24 * 60 * 60 * 1000;
+        planCreatedAt = new Date(matchedPlan.createdAt).toLocaleDateString();
+        planExpiryDate = new Date(expiryDate).toLocaleDateString();
+      }
+
+      return {
+        ...user._doc,
+        required: isComplete ? "yes" : "no",
+        planName: matchedPlan?.name || 'N/A',
+        planCreatedAt,
+        planExpiryDate,
+        packageType: matchedPlan?.packageType || 'N/A',
+        planDuration: matchedPlan?.durationDays || 'N/A',
+        adsCount: adsCountByUser[user.phoneNumber] || 0, // ✅ Include ad count
+      };
+    }).filter(user => user.required === "no");
 
     res.status(200).json({
-      message: 'Pending properties fetched successfully.',
-      data: pendingProperties,
+      message: "Pending properties with incomplete required fields and plan info fetched successfully!",
+      users: incompleteUsers
     });
   } catch (error) {
+    console.error('Error fetching pending properties:', error);
     res.status(500).json({
       message: 'Error fetching pending properties.',
-      error: error.message,
+      error: error.message
     });
   }
 });
+
+
+
+// router.get('/properties/pending', async (req, res) => {
+//   try {
+//     const users = await AddModel.find({ status: 'incomplete' });
+//     const plans = await PricingPlans.find();
+
+//     const requiredFields = [
+//       'propertyMode', 'propertyType', 'price',
+//       'totalArea', 'areaUnit',
+//       'salesType', 'postedBy'
+//     ];
+
+//     const incompleteUsers = users.map((user) => {
+//       const isComplete = requiredFields.every(
+//         (field) =>
+//           user[field] !== undefined &&
+//           user[field] !== null &&
+//           String(user[field]).trim() !== ''
+//       );
+
+//       // Match plan
+//       const matchedPlan = plans.find(plan =>
+//         Array.isArray(plan.phoneNumber)
+//           ? plan.phoneNumber.includes(user.phoneNumber)
+//           : plan.phoneNumber === user.phoneNumber
+//       );
+
+//       let planCreatedAt = 'N/A';
+//       let planExpiryDate = 'N/A';
+
+//       if (matchedPlan && matchedPlan.createdAt && matchedPlan.durationDays) {
+//         const expiryDate = new Date(matchedPlan.createdAt).getTime() + matchedPlan.durationDays * 24 * 60 * 60 * 1000;
+//         planCreatedAt = new Date(matchedPlan.createdAt).toLocaleDateString();
+//         planExpiryDate = new Date(expiryDate).toLocaleDateString();
+//       }
+
+//       return {
+//         ...user._doc,
+//         required: isComplete ? "yes" : "no",
+//         planName: matchedPlan?.name || 'N/A',
+//         planCreatedAt,
+//         planExpiryDate,
+//         packageType: matchedPlan?.packageType || 'N/A',
+//         planDuration: matchedPlan?.durationDays || 'N/A',
+//       };
+//     }).filter(user => user.required === "no");
+
+//     res.status(200).json({
+//       message: "Pending properties with incomplete required fields and plan info fetched successfully!",
+//       users: incompleteUsers
+//     });
+//   } catch (error) {
+//     console.error('Error fetching pending properties:', error);
+//     res.status(500).json({
+//       message: 'Error fetching pending properties.',
+//       error: error.message
+//     });
+//   }
+// });
+
+
+router.get('/properties/pre-approved', async (req, res) => {
+  try {
+    const users = await AddModel.find({ status: 'complete' });
+    const plans = await PricingPlans.find();
+
+    // ✅ Step 1: Get all properties and compute ad count per phoneNumber
+    const allProperties = await AddModel.find({});
+    const adsCountByUser = allProperties.reduce((acc, property) => {
+      const phone = property.phoneNumber;
+      acc[phone] = (acc[phone] || 0) + 1;
+      return acc;
+    }, {});
+
+    const requiredFields = [
+      'propertyMode', 'propertyType', 'price',
+      'totalArea', 'areaUnit',
+      'salesType', 'postedBy'
+    ];
+
+    const completeUsers = users.map((user) => {
+      const isComplete = requiredFields.every((field) => {
+        const value = user[field];
+        return value !== undefined && value !== null && String(value).trim() !== '';
+      });
+
+      const matchedPlan = plans.find(plan =>
+        Array.isArray(plan.phoneNumber)
+          ? plan.phoneNumber.includes(user.phoneNumber)
+          : plan.phoneNumber === user.phoneNumber
+      );
+
+      let planCreatedAt = 'N/A';
+      let planExpiryDate = 'N/A';
+
+      if (matchedPlan && matchedPlan.createdAt && matchedPlan.durationDays) {
+        const expiryDate = new Date(matchedPlan.createdAt).getTime() + matchedPlan.durationDays * 24 * 60 * 60 * 1000;
+        planCreatedAt = new Date(matchedPlan.createdAt).toLocaleDateString();
+        planExpiryDate = new Date(expiryDate).toLocaleDateString();
+      }
+
+      return {
+        ...user._doc,
+        required: isComplete ? "yes" : "no",
+        planName: matchedPlan?.name || 'N/A',
+        planCreatedAt,
+        planExpiryDate,
+        packageType: matchedPlan?.packageType || 'N/A',
+        planDuration: matchedPlan?.durationDays || 'N/A',
+        adsCount: adsCountByUser[user.phoneNumber] || 0  // ✅ Added ads count
+      };
+    }).filter(user => user.required === "yes");
+
+    res.status(200).json({
+      message: "Pre-approved properties with complete required fields and plan info fetched successfully!",
+      users: completeUsers
+    });
+  } catch (error) {
+    console.error('Error fetching pre-approved properties:', error);
+    res.status(500).json({
+      message: 'Error fetching pre-approved properties.',
+      error: error.message
+    });
+  }
+});
+
+
+
+// router.get('/properties/pre-approved', async (req, res) => {
+//   try {
+//     const users = await AddModel.find({ status: 'complete' });
+//     const plans = await PricingPlans.find();
+
+//     const requiredFields = [
+//       'propertyMode', 'propertyType', 'price',
+//       'totalArea', 'areaUnit',
+//       'salesType', 'postedBy'
+//     ];
+
+//     const completeUsers = users.map((user) => {
+//       const isComplete = requiredFields.every((field) => {
+//         const value = user[field];
+//         return value !== undefined && value !== null && String(value).trim() !== '';
+//       });
+
+//       // Match plan
+//       const matchedPlan = plans.find(plan =>
+//         Array.isArray(plan.phoneNumber)
+//           ? plan.phoneNumber.includes(user.phoneNumber)
+//           : plan.phoneNumber === user.phoneNumber
+//       );
+
+//       let planCreatedAt = 'N/A';
+//       let planExpiryDate = 'N/A';
+
+//       if (matchedPlan && matchedPlan.createdAt && matchedPlan.durationDays) {
+//         const expiryDate = new Date(matchedPlan.createdAt).getTime() + matchedPlan.durationDays * 24 * 60 * 60 * 1000;
+//         planCreatedAt = new Date(matchedPlan.createdAt).toLocaleDateString();
+//         planExpiryDate = new Date(expiryDate).toLocaleDateString();
+//       }
+
+//       return {
+//         ...user._doc,
+//         required: isComplete ? "yes" : "no",
+//         planName: matchedPlan?.name || 'N/A',
+//         planCreatedAt,
+//         planExpiryDate,
+//         packageType: matchedPlan?.packageType || 'N/A',
+//         planDuration: matchedPlan?.durationDays || 'N/A',
+//       };
+//     }).filter(user => user.required === "yes");
+
+//     res.status(200).json({
+//       message: "Pre-approved properties with complete required fields and plan info fetched successfully!",
+//       users: completeUsers
+//     });
+//   } catch (error) {
+//     console.error('Error fetching pre-approved properties:', error);
+//     res.status(500).json({
+//       message: 'Error fetching pre-approved properties.',
+//       error: error.message
+//     });
+//   }
+// });
+
+
+
+// router.get('/properties/pending', async (req, res) => {
+//   try {
+//     // Only fetch documents with status: 'incomplete'
+//     const users = await AddModel.find({ status: 'incomplete' });
+
+//     const requiredFields = [
+//       'propertyMode', 'propertyType', 'price',
+//       'totalArea', 'areaUnit',
+//       'salesType', 'postedBy'
+//     ];
+
+//     // Filter only users where required fields are incomplete
+//     const incompleteUsers = users
+//       .map((user) => {
+//         const isComplete = requiredFields.every(
+//           (field) =>
+//             user[field] !== undefined &&
+//             user[field] !== null &&
+//             String(user[field]).trim() !== ''
+//         );
+
+//         return {
+//           ...user._doc,
+//           required: isComplete ? "yes" : "no",
+//         };
+//       })
+//       .filter(user => user.required === "no"); // Only return required = "no"
+
+//     res.status(200).json({
+//       message: "Pending properties with incomplete required fields fetched successfully!",
+//       users: incompleteUsers
+//     });
+//   } catch (error) {
+//     console.error('Error fetching pending properties:', error);
+//     res.status(500).json({
+//       message: 'Error fetching pending properties.',
+//       error: error.message
+//     });
+//   }
+// });
+
+
+
+// router.get('/properties/pre-approved', async (req, res) => { 
+//   try {
+//     const users = await AddModel.find({ status: 'complete' });
+
+//     console.log("Found 'complete' status users:", users.length);
+
+//     const requiredFields = [
+//       'propertyMode', 'propertyType', 'price',
+//       'totalArea', 'areaUnit',
+//       'salesType', 'postedBy'
+//     ];
+
+//     const completeUsers = users
+//       .map((user) => {
+//         const isComplete = requiredFields.every((field) => {
+//           const value = user[field];
+//           const valid = value !== undefined && value !== null && String(value).trim() !== '';
+//           if (!valid) console.log(`Missing/invalid field "${field}" in ppcId: ${user.ppcId}`);
+//           return valid;
+//         });
+
+//         return {
+//           ...user._doc,
+//           required: isComplete ? "yes" : "no",
+//         };
+//       })
+//       .filter(user => user.required === "yes");
+
+//     res.status(200).json({
+//       message: "Pre-approved properties with complete required fields fetched successfully!",
+//       users: completeUsers
+//     });
+//   } catch (error) {
+//     console.error('Error fetching pre-approved properties:', error);
+//     res.status(500).json({
+//       message: 'Error fetching pre-approved properties.',
+//       error: error.message
+//     });
+//   }
+// });
+
+
 
 
 // Assuming AddModel is already imported
@@ -3346,6 +5747,7 @@ router.get('/approved-properties-count', async (req, res) => {
 
     res.status(200).json({ approvedProperties: count });
   } catch (error) {
+    console.error("Error fetching approved properties count:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });

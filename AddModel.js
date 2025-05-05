@@ -167,6 +167,15 @@ const AddSchema = new mongoose.Schema({
     default: '+91',
   },
 
+
+  minPrice:{
+    type:String,
+  },
+  maxPrice: {
+    type:String,
+  },
+
+
   propertyMode: { type: String },
 
   propertyType: { type: String },
@@ -276,6 +285,17 @@ const AddSchema = new mongoose.Schema({
     type: String,
     default: 'User'
   },
+
+  
+  deletedBy: {
+    type: String,
+    default: 'User'
+  },
+  
+  deletedAt: {
+    type: Date,
+    default: Date.now // or null, depending on how you handle deletion
+  },
   
 
   bankLoan: { type: String },
@@ -356,6 +376,28 @@ planName: {
   deletionDate: { type: Date, default: null },
 
   alternatePhone: { type: String },
+
+  // location: {
+  //   type: {
+  //     type: String,
+  //     enum: ['Point'],
+  //     default: 'Point'
+  //   },
+  //   coordinates: {
+  //     type: [Number],
+  //     default: [0, 0], // Default coordinates (null island)
+  //     validate: {
+  //       validator: function(coords) {
+  //         // Only validate if coordinates are provided (not default)
+  //         if (coords[0] === 0 && coords[1] === 0) return true;
+  //         return coords.length === 2 && 
+  //                coords[0] >= -180 && coords[0] <= 180 && 
+  //                coords[1] >= -90 && coords[1] <= 90;
+  //       },
+  //       message: props => `${props.value} is not a valid coordinate pair [longitude, latitude]`
+  //     }
+  //   }
+  // }
 }, {
   timestamps: true,
 });

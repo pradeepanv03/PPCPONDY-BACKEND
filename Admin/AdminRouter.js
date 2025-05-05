@@ -4,6 +4,32 @@ const AdminLogin = require('../Admin/AdminModel')
 const ProfileData = require("../MyProfile/ProfileModel");
 
 
+// // Admin login route (POST /login)
+// router.post('/adminlogin', async (req, res) => {
+//     const { name, password } = req.body;
+
+//     try {
+//         // Find the admin by name
+//         const admin = await AdminLogin.findOne({ name,password });
+//         if (!admin) {
+//             return res.status(400).json({ message: 'Invalid credentials' });
+//         }
+
+//         // Compare password (you would hash the password in a real app)
+//         if (admin.password !== password) {
+//             return res.status(400).json({ message: 'Invalid credentials' });
+//         }
+
+//         // Respond with a success message and token (implement JWT or session handling here)
+//         return res.status(200).json({ message: 'Login successful', data: admin });
+
+//     } catch (error) {
+//         return res.status(500).json({ message: 'Something went wrong', error: error.message });
+//     }
+// });
+
+
+// Admin login route (POST /adminlogin)
 router.post('/adminlogin', async (req, res) => {
     const { name, password, role, userType } = req.body;
 
@@ -58,6 +84,7 @@ router.get('/get-admin-logs', async (req, res) => {
             currentPage: page
         });
     } catch (error) {
+        console.error("Error fetching admin logs:", error);
         return res.status(500).json({
             message: 'Server Error',
             error: error.message

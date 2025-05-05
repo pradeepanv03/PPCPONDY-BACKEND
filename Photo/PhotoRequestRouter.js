@@ -214,6 +214,62 @@ function normalizePhoneNumber(phoneNumber) {
     return phoneNumber;
 }
 
+// // ✅ **Get Photo Requests for a Specific Buyer**
+// router.get("/photo-requests/owner/:phoneNumber", async (req, res) => {
+//     try {
+//         let phoneNumber = normalizePhoneNumber(req.params.phoneNumber);
+
+//         // Find all photo requests made by this buyer
+//         const buyerRequests = await PhotoRequest.find({
+//             $or: [
+//                 { requesterPhoneNumber: phoneNumber },
+//                 { requesterPhoneNumber: `+91${phoneNumber}` },
+//                 { requesterPhoneNumber: `91${phoneNumber}` }
+//             ]
+//         });
+
+//         if (buyerRequests.length === 0) {
+//             return res.status(404).json({ message: "No photo requests found for this buyer." });
+//         }
+
+      
+//         const propertyDetails = await Promise.all(
+//           buyerRequests.map(async (request) => {
+//               const property = await Property.findOne({ ppcId: request.ppcId });
+      
+//               if (!property) {
+//               }
+      
+//               return {
+//                   _id: request._id,
+//                   ppcId: request.ppcId,
+//                   propertyMode: property?.propertyMode || "N/A",
+//                   price: property?.price || 0,
+//                   propertyType: property?.propertyType || "N/A",
+//                   totalArea: property?.totalArea || "N/A",
+//                   bedrooms: property?.bedrooms || "N/A",
+//                   ownership: property?.ownership || "N/A",
+//                   bestTimeToCall: property?.bestTimeToCall || "N/A",
+//                   area:property.area || "N/A",
+//                   status: request.status,
+//                   photos:property.photos,
+//                   createdAt: request.createdAt,
+//                   updatedAt: request.updatedAt,
+//                   postedUserPhoneNumber: request.postedUserPhoneNumber || "N/A",
+//                   createdAt:request.createdAt || null,
+//                 };
+//           })
+//       );
+      
+
+//         res.status(200).json(propertyDetails);
+//     } catch (error) {
+//         res.status(500).json({ message: "Error fetching buyer's photo requests.", error: error.message });
+//     }
+// });
+
+
+// ✅ Get Photo Requests for a Specific Buyer (with property details)
 router.get("/photo-requests/owner/:phoneNumber", async (req, res) => {
   try {
     let phoneNumber = normalizePhoneNumber(req.params.phoneNumber);
@@ -239,6 +295,7 @@ router.get("/photo-requests/owner/:phoneNumber", async (req, res) => {
 
         // If property is not found, return default/fallback values
         if (!property) {
+          console.warn(`No property found for PPC ID: ${request.ppcId}`);
           return {
             _id: request._id,
             ppcId: request.ppcId,

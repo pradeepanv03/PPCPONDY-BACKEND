@@ -8,6 +8,9 @@ ppcId:{
 phoneNumber:{
   type:String
 },
+adminName:{
+  type:String
+},
   followupStatus: {
     type: String,
     enum: ['Ring', 'Ready To Pay', 'Not Decided', 'Not Interested-Closed', 'Paid Closed'],

@@ -13,6 +13,24 @@ const normalizePhoneNumber = (phoneNumber) => {
     return phoneNumber.replace(/^\+?91/, ""); // Convert +91XXXXXX or 91XXXXXX to XXXXXX
 };
 
+// // ✅ Get all plans for a specific phone number
+// router.get("/plans/:phoneNumber", async (req, res) => {
+//     try {
+//         let { phoneNumber } = req.params;
+//         phoneNumber = normalizePhoneNumber(phoneNumber);
+
+//         const plans = await PricingPlans.find({ phoneNumber });
+//         if (plans.length === 0) {
+//             return res.status(404).json({ message: "No plans found for this phone number." });
+//         }
+
+//         return res.status(200).json({ success: true, plans });
+//     } catch (error) {
+//         return res.status(500).json({ message: "Error fetching plans.", error: error.message });
+//     }
+// });
+
+
 router.get("/plans/:phoneNumber", async (req, res) => {
     try {
         let { phoneNumber } = req.params;
@@ -176,6 +194,7 @@ router.post("/select-plan", async (req, res) => {
                 createdAt: new Date()
             });
         } catch (notifErr) {
+            console.error("Notification error:", notifErr);
         }
 
         return res.status(200).json({
@@ -196,6 +215,66 @@ router.post("/select-plan", async (req, res) => {
 });
 
 
+// router.post("/select-plan", async (req, res) => {
+//     const { phoneNumber, planId } = req.body;
+
+//     try {
+//         const existingPlan = await PricingPlans.findOne({ phoneNumber });
+
+//         if (existingPlan) {
+//             return res.status(400).json({
+//                 status: "error",
+//                 message: "You already have an active plan!",
+//             });
+//         }
+
+//         const selectedPlan = await PricingPlans.findById(planId);
+
+//         if (!selectedPlan) {
+//             return res.status(404).json({
+//                 status: "error",
+//                 message: "Plan not found!",
+//             });
+//         }
+
+//         // Set phoneNumber, createdAt, and expireDate
+//         selectedPlan.phoneNumber = phoneNumber;
+//         selectedPlan.createdAt = new Date();
+//         selectedPlan.expireDate = moment(selectedPlan.createdAt).add(selectedPlan.durationDays, 'days').toDate();
+
+//         await selectedPlan.save();
+
+//         // Notification
+//         try {
+//             await NotificationUser.create({
+//                 recipientPhoneNumber: phoneNumber,
+//                 senderPhoneNumber: phoneNumber,
+//                 ppcId: "PLAN-" + planId,
+//                 message: `A new plan has been selected by ${phoneNumber}.`,
+//                 createdAt: new Date()
+//             });
+//         } catch (notifErr) {
+//             console.error("Notification error:", notifErr);
+//         }
+
+//         return res.status(200).json({
+//             status: "success",
+//             message: "Plan selected successfully!",
+//             selectedPlan,
+//             createdDate: moment(selectedPlan.createdAt).format('YYYY-MM-DD'),
+//             expireDate: moment(selectedPlan.expireDate).format('YYYY-MM-DD')
+//         });
+
+//     } catch (error) {
+//         return res.status(500).json({
+//             status: "error",
+//             message: "Error selecting plan.",
+//             error: error.message,
+//         });
+//     }
+// });
+
+
 router.get("/selected-plans", async (req, res) => {
     try {
         const selectedPlans = await PricingPlans.find({ phoneNumber: { $exists: true } });
@@ -213,6 +292,23 @@ router.get("/selected-plans", async (req, res) => {
     }
 });
 
+
+// router.get("/selected-plans", async (req, res) => {
+//     try {
+//         const selectedPlans = await UserPlans.find().populate("planId");
+
+//         return res.status(200).json({
+//             status: "success",
+//             data: selectedPlans,
+//         });
+//     } catch (error) {
+//         return res.status(500).json({
+//             status: "error",
+//             message: "Failed to fetch selected plans.",
+//             error: error.message,
+//         });
+//     }
+// });
 
 
 router.get("/all-selected-plans", async (req, res) => {

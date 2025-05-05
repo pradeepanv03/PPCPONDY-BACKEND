@@ -17,7 +17,10 @@ const BillSchema = new mongoose.Schema({
   featuredMaxAds: { type: Number, required: true },
   discount: { type: Number, default: 0 },
   netAmount: { type: Number, required: true },
-  createdAt: { type: Date, default: Date.now }
+  createdAt: { type: Date, default: Date.now },
+  billCreatedBy:{type:String,
+    default:"User",
+  }
 });
 
 module.exports = mongoose.model('Bill', BillSchema);
