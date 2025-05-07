@@ -194,7 +194,7 @@ const AddSchema = new mongoose.Schema({
   },
   
 
-  previousStatus: { type: String, enum: ['incomplete', 'complete','delete','active'] }, 
+  previousStatus: { type: String, enum: ['incomplete', 'complete','delete','active','contact'] }, 
 
   featureStatus: {
     type: String,
@@ -377,27 +377,6 @@ planName: {
 
   alternatePhone: { type: String },
 
-  // location: {
-  //   type: {
-  //     type: String,
-  //     enum: ['Point'],
-  //     default: 'Point'
-  //   },
-  //   coordinates: {
-  //     type: [Number],
-  //     default: [0, 0], // Default coordinates (null island)
-  //     validate: {
-  //       validator: function(coords) {
-  //         // Only validate if coordinates are provided (not default)
-  //         if (coords[0] === 0 && coords[1] === 0) return true;
-  //         return coords.length === 2 && 
-  //                coords[0] >= -180 && coords[0] <= 180 && 
-  //                coords[1] >= -90 && coords[1] <= 90;
-  //       },
-  //       message: props => `${props.value} is not a valid coordinate pair [longitude, latitude]`
-  //     }
-  //   }
-  // }
 }, {
   timestamps: true,
 });

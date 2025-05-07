@@ -5,39 +5,6 @@ const AddModel = require('../AddModel');
 
 
 
-// router.post('/create-bill', async (req, res) => {
-//   try {
-//     const billData = req.body;
-
-//     billData.billCreatedBy = billData.billCreatedBy || "User";
-
-
-//     // 1. Create new bill
-//     const newBill = new Bill(billData);
-//     await newBill.save();
-
-//     // 2. Update corresponding property status to 'Active'
-//     const updatedProperty = await AddModel.findOneAndUpdate(
-//       { ppcId: billData.ppId },
-//       // { status: 'active' },
-//       { new: true } // Return updated document
-//     );
-
-//     res.status(201).json({
-//       success: true,
-//       message: "Bill created successfully and property status set to Active",
-//       data: {
-//         ...newBill._doc,
-//         status: updatedProperty?.status || 'N/A'
-//       }
-//     });
-//   } catch (error) {
-//     console.error('Error creating bill:', error);
-//     res.status(500).json({ success: false, message: 'Server Error', error: error.message });
-//   }
-// });
-
-
 router.post('/create-bill', async (req, res) => {
   try {
     const billData = req.body;
@@ -71,67 +38,10 @@ router.post('/create-bill', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error creating bill:', error);
     res.status(500).json({ success: false, message: 'Server Error', error: error.message });
   }
 });
 
-
-// router.post('/create-bill', async (req, res) => {
-//   try {
-//     const billData = req.body;
-
-//     // Detect if request is from system or user
-//     const requestSource = req.headers['x-request-source'];
-
-//     if (requestSource === 'system') {
-//       billData.billCreatedBy = "Admin";
-//     } else {
-//       billData.billCreatedBy = billData.billCreatedBy || "User";
-//     }
-
-//     // 1. Create new bill
-//     const newBill = new Bill(billData);
-//     await newBill.save();
-
-//     // 2. Update property status
-//     const updatedProperty = await AddModel.findOneAndUpdate(
-//       { ppcId: billData.ppId },
-//       // { status: 'active' },
-//       { new: true }
-//     );
-
-//     res.status(201).json({
-//       success: true,
-//       message: "Bill created successfully and property status set to Active",
-//       data: {
-//         ...newBill._doc,
-//         status: updatedProperty?.status || 'N/A'
-//       }
-//     });
-//   } catch (error) {
-//     console.error('Error creating bill:', error);
-//     res.status(500).json({ success: false, message: 'Server Error', error: error.message });
-//   }
-// });
-
-
-
-
-// // Create a new bill
-// router.post('/create-bill', async (req, res) => {
-//   try {
-//     const billData = req.body;
-
-//     const newBill = new Bill(billData);
-//     await newBill.save();
-
-//     res.status(201).json({ success: true, message: 'Bill created successfully', data: newBill });
-//   } catch (error) {
-//     console.error('Error creating bill:', error);
-//     res.status(500).json({ success: false, message: 'Server Error', error: error.message });
-//   }
-// });
 
 
 router.get('/get-bill/:ppcId', async (req, res) => {
@@ -146,7 +56,6 @@ router.get('/get-bill/:ppcId', async (req, res) => {
 
     res.status(200).json({ success: true, data: bill });
   } catch (error) {
-    console.error('Error fetching bill:', error);
     res.status(500).json({ success: false, message: 'Server Error', error: error.message });
   }
 });
@@ -170,7 +79,6 @@ router.put('/update-bill/:ppcId', async (req, res) => {
 
     res.status(200).json({ success: true, message: 'Bill updated successfully', data: updatedBill });
   } catch (error) {
-    console.error('Error updating bill:', error);
     res.status(500).json({ success: false, message: 'Server Error', error: error.message });
   }
 });
@@ -212,7 +120,6 @@ router.get('/get-default-bill-data', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error getting default bill data:', error);
     res.status(500).json({ success: false, message: 'Server Error', error: error.message });
   }
 });
@@ -224,7 +131,6 @@ router.get('/bills', async (req, res) => {
     const bills = await Bill.find().sort({ createdAt: -1 });
     res.status(200).json({ success: true, data: bills });
   } catch (error) {
-    console.error('Error fetching bills:', error);
     res.status(500).json({ success: false, message: 'Server Error', error: error.message });
   }
 });
@@ -238,7 +144,6 @@ router.get('/bill/:id', async (req, res) => {
     }
     res.status(200).json({ success: true, data: bill });
   } catch (error) {
-    console.error('Error fetching bill:', error);
     res.status(500).json({ success: false, message: 'Server Error', error: error.message });
   }
 });

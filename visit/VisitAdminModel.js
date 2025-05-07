@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 
 const UserInteractionSchema = new mongoose.Schema({
     userName: { type: String, required: true }, // Name of the user
+    phoneNumber: { type: String },
     role: {
         type: String,
         required: true,

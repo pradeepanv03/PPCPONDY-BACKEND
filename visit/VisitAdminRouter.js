@@ -20,6 +20,26 @@ router.post('/record-view', async (req, res) => {
     }
 });
 
+
+// POST /record-view
+router.post('/record-views', async (req, res) => {
+    const { phoneNumber, viewedFile, viewTime } = req.body;
+  
+    try {
+      const newInteraction = new UserInteraction({
+        phoneNumber,
+        viewedFile,
+        viewTime: viewTime || new Date()  // fallback if client doesn't send
+      });
+  
+      await newInteraction.save();
+      res.status(200).json({ message: 'Interaction recorded successfully' });
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to record interaction', error: error.message });
+    }
+  });
+  
+
 // routes/userInteractions.js or similar
 router.get('/get-views-by-date', async (req, res) => {
     const { date } = req.query; // Expecting '2025-04-22' format
@@ -113,32 +133,6 @@ router.get('/get-all-views-grouped', async (req, res) => {
         res.status(500).json({ message: 'Failed to fetch data', error: error.message });
     }
 });
-
-// router.get('/get-all-views-detailed', async (req, res) => {
-//     try {
-//         const result = await UserInteraction.aggregate([
-//             {
-//                 $project: {
-//                     userName: 1,
-//                     viewedFile: 1,
-//                     viewTime: {
-//                         $dateToString: { format: "%Y-%m-%d %H:%M:%S", date: "$viewTime" }
-//                     },
-//                     viewDate: {
-//                         $dateToString: { format: "%Y-%m-%d", date: "$viewTime" }
-//                     }
-//                 }
-//             },
-//             {
-//                 $sort: { viewDate: -1, userName: 1, viewTime: 1 }
-//             }
-//         ]);
-
-//         res.status(200).json(result);
-//     } catch (error) {
-//         res.status(500).json({ message: 'Failed to fetch detailed view data', error: error.message });
-//     }
-// });
 
 
 router.get('/get-all-views-detailed', async (req, res) => {

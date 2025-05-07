@@ -20,21 +20,6 @@ const upload = multer({ storage });
 
 
 
-// // Add New Profile
-// router.post("/profile", upload.single("profileImage"), async (req, res) => {
-//   try {
-//     const { pucNumber, name, password, email } = req.body;
-//     const profileImage = req.file ? req.file.path : "";
-
-//     const newProfile = new ProfileData({ pucNumber, profileImage, name, password, email });
-//     await newProfile.save();
-
-//     res.status(201).json({ message: "Profile created successfully", data: newProfile });
-//   } catch (error) {
-//     res.status(500).json({ message: "Error creating profile", error });
-//   }
-// });
-
 router.post("/profile", upload.single("profileImage"), async (req, res) => {
   try {
     const { name, password, email, createdBy } = req.body; // 👈 Include createdBy
