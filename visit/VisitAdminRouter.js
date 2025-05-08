@@ -39,6 +39,21 @@ router.post('/record-views', async (req, res) => {
     }
   });
   
+// GET /get-record-views
+router.get('/get-record-views', async (req, res) => {
+    try {
+      const views = await UserInteraction.find()
+        .sort({ viewTime: -1 }) // sort by most recent
+        .select('phoneNumber viewedFile viewTime'); // only return selected fields
+  
+      res.status(200).json(views);
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to fetch interactions', error: error.message });
+    }
+  });
+  
+  
+
 
 // routes/userInteractions.js or similar
 router.get('/get-views-by-date', async (req, res) => {
@@ -133,6 +148,7 @@ router.get('/get-all-views-grouped', async (req, res) => {
         res.status(500).json({ message: 'Failed to fetch data', error: error.message });
     }
 });
+
 
 
 router.get('/get-all-views-detailed', async (req, res) => {
