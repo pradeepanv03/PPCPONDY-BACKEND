@@ -5,7 +5,6 @@ const Offer = require('../Offer/OfferModel');
 const AddModel = require('../AddModel');
 const NotificationUser = require('../Notification/NotificationDetailModel');
 
-
 router.post('/offer', async (req, res) => {
     try {
         const { ppcId, phoneNumber, price } = req.body;
@@ -168,7 +167,6 @@ router.get("/offers/owner/count/:phoneNumber", async (req, res) => {
 
 
 
-
 router.get('/offers', async (req, res) => {
     try {
         const { ppcId } = req.params;
@@ -251,7 +249,7 @@ router.get('/offers/buyer/:phoneNumber', async (req, res) => {
         const offersData = ownerOffers.map(offer => {
             const property = propertiesByOwner.find(prop => prop.ppcId === offer.ppcId);
             return {
-                
+      
                 ppcId: offer.ppcId,
                 offeredPrice: offer.price,
                 buyerPhoneNumber: offer.phoneNumber,

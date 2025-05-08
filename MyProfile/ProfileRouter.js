@@ -19,7 +19,6 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 
-
 router.post("/profile", upload.single("profileImage"), async (req, res) => {
   try {
     const { name, password, email, createdBy } = req.body; // 👈 Include createdBy

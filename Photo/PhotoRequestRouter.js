@@ -213,7 +213,7 @@ function normalizePhoneNumber(phoneNumber) {
     }
     return phoneNumber;
 }
-
+// ✅ Get Photo Requests for a Specific Buyer (with property details)
 router.get("/photo-requests/owner/:phoneNumber", async (req, res) => {
   try {
     let phoneNumber = normalizePhoneNumber(req.params.phoneNumber);
@@ -322,10 +322,7 @@ router.get("/photo-requests/buyer/:phoneNumber", async (req, res) => {
                     propertyMode: property?.propertyMode || "",
                     price: property?.price || 0,
                     propertyType: property?.propertyType || "",
-                    // totalArea:property.totalArea,
-                    // bedrooms:property.bedrooms,
-                    // ownership:property.ownership,
-                    // bestTimeToCall:property.bestTimeToCall,
+               
                     city:property?.city || "",
                     status: request.status,
                     createdAt: request.createdAt,

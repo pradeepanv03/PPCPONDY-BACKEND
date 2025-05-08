@@ -25,6 +25,7 @@ const formatPhoneNumber = (phone, countryCode) => {
 
 
 
+
 // GET /user-lead-stats
 router.get('/user-lead-stats', async (req, res) => {
   try {
@@ -76,7 +77,7 @@ router.get('/user-lead-stats', async (req, res) => {
 
 
 router.post('/user/register', async (req, res) => {
-  const { phone, countryCode = '+91', mode = 'web' } = req.body;
+  const { phone, countryCode, mode } = req.body;
 
   if (!phone) {
     return res.status(400).json({ message: 'Phone number is required.' });

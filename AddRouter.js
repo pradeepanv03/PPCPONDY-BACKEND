@@ -149,7 +149,6 @@ router.get("/property/:ppcId", async (req, res) => {
 
     res.status(200).json(property);
   } catch (error) {
-    console.error("Error fetching property:", error);
     res.status(500).json({ message: "Internal Server Error", error: error.message });
   }
 });
@@ -216,7 +215,6 @@ router.get("/user-viewed-properties", async (req, res) => {
 
     res.status(200).json({ viewedProperties: userViews.viewedProperties });
   } catch (error) {
-    console.error("Error fetching viewed properties:", error);
     res.status(500).json({ message: "Internal Server Error", error: error.message });
   }
 });
@@ -278,7 +276,6 @@ router.post("/user-viewed-property", async (req, res) => {
 
     res.status(200).json({ message: "Property view recorded and notification sent" });
   } catch (error) {
-    console.error("Error recording property view:", error);
     res.status(500).json({ message: "Internal Server Error", error: error.message });
   }
 });
@@ -699,6 +696,14 @@ router.get("/user-viewed-properties", async (req, res) => {
     const sortedViews = userViews.viewedProperties.sort(
       (a, b) => new Date(b.viewedAt) - new Date(a.viewedAt)
     );
+
+    // // Optional: fetch notifications for viewed properties
+    // const viewedPpcIds = sortedViews.map(view => view.ppcId);
+    // const relatedNotifications = await NotificationUser.find({
+    //   senderPhoneNumber: normalizedPhoneNumber,
+    //   ppcId: { $in: viewedPpcIds }
+    // }).sort({ createdAt: -1 });
+
     res.status(200).json({
       viewedProperties: sortedViews,
       // notifications: relatedNotifications
@@ -708,6 +713,7 @@ router.get("/user-viewed-properties", async (req, res) => {
     res.status(500).json({ message: "Internal Server Error", error: error.message });
   }
 });
+
 
 
 
@@ -954,7 +960,6 @@ router.get("/property-buyer-viewed", async (req, res) => {
 
 
 
-
 router.post(
   '/update-property',
   upload.fields([{ name: 'video', maxCount: 1 }, { name: 'photos', maxCount: 15 }]),
@@ -1058,6 +1063,7 @@ router.post(
         'propertyType',   'postedBy', 'areaUnit', 'salesType',
        'totalArea',
       ];
+
 
       const isComplete = requiredFields.every((field) => user[field]);
       user.status = isComplete ? "complete" : "incomplete"; 
@@ -1216,7 +1222,6 @@ router.get("/pending-properties-count", async (req, res) => {
 
     res.status(200).json({ pendingProperties: count });
   } catch (error) {
-    console.error("Error counting pending properties:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
@@ -1797,6 +1802,8 @@ router.delete('/delete-viewed-property/:ppcId', async (req, res) => {
 });
 
 
+
+
 router.get('/latest-ppcid', async (req, res) => {
     try {
         const latestProperty = await AddModel.findOne().sort({ ppcId: -1 });
@@ -1805,7 +1812,6 @@ router.get('/latest-ppcid', async (req, res) => {
         res.status(500).json({ message: 'Error fetching latest ppcId', error });
     }
 });
-
 
 
 
@@ -1955,6 +1961,7 @@ router.delete('/delete-viewed-property/:ppcId', async (req, res) => {
     return res.status(500).json({ message: "Internal Server Error", error: error.message });
   }
 });
+
 
 
 
@@ -2305,6 +2312,7 @@ router.get('/edit-property/:ppcId', async (req, res) => {
 
 
 
+
 router.get('/fetch-all-property-details', async (req, res) => {
   try {
     const properties = await AddModel.find({});
@@ -2381,7 +2389,6 @@ router.get('/fetch-all-property-details', async (req, res) => {
     });
 
   } catch (error) {
-    console.error("Error in merged API:", error.message);
     res.status(500).json({
       success: false,
       message: "Internal Server Error",
@@ -2499,7 +2506,6 @@ router.get('/fetch-alls-datas', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error fetching all user details:', error);
     res.status(500).json({
       message: 'Error fetching all user details.',
       error: error.message
@@ -2590,7 +2596,6 @@ router.get('/fetch-all-postby-properties', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error fetching all user details:', error);
     res.status(500).json({
       message: 'Error fetching all user details.',
       error: error.message
@@ -2672,7 +2677,6 @@ router.get('/fetch-all-expire-property', async (req, res) => {
           ...property.toObject(),
           required,
           adsCount,
-          adminName,
           followUpAdminName,
           billNo,
           status: property.status, // Corrected: Added status from the property
@@ -2704,14 +2708,12 @@ router.get('/fetch-all-expire-property', async (req, res) => {
       data: userPlansWithProperties,
     });
   } catch (error) {
-    console.error('Error fetching all plans and properties:', error);
     res.status(500).json({
       message: 'Error fetching all plans and properties.',
       error: error.message,
     });
   }
 });
-
 
 
 
@@ -2739,7 +2741,6 @@ router.get('/ads-count-by-user', async (req, res) => {
       data: adsCountArray,
     });
   } catch (error) {
-    console.error('Error fetching ad count:', error);
     res.status(500).json({
       message: 'Failed to fetch ad counts',
       error: error.message,
@@ -2793,6 +2794,7 @@ router.get('/fetch-active-promotor', (req, res) => {
 
 
 
+
 router.get('/fetch-free-plan-properties', async (req, res) => {
   try {
     // 1. Find all users who have Free Plan
@@ -2837,7 +2839,6 @@ router.get('/fetch-free-plan-properties', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Error fetching Free Plan user properties:', error);
     res.status(500).json({ message: 'Error fetching Free Plan user properties.', error: error.message });
   }
 });
@@ -2901,7 +2902,6 @@ router.get('/fetch-plan-by-phone-number', async (req, res) => {
       properties: enhancedProperties,
     });
   } catch (error) {
-    console.error('Error fetching plan details:', error);
 
     // Handle server errors
     res.status(500).json({
@@ -2964,7 +2964,6 @@ router.get('/fetch-all-plans-and-properties', async (req, res) => {
       data: userPlansWithProperties,
     });
   } catch (error) {
-    console.error('Error fetching all plans and properties:', error);
     res.status(500).json({
       message: 'Error fetching all plans and properties.',
       error: error.message,
@@ -3057,7 +3056,6 @@ router.get('/fetch-all-free-plans', async (req, res) => {
       data: userPlansWithProperties,
     });
   } catch (error) {
-    console.error('Error fetching Free plans and properties:', error);
     res.status(500).json({
       message: 'Error fetching Free plans and properties.',
       error: error.message,
@@ -3125,7 +3123,6 @@ router.get('/fetch-all-featured-properties', async (req, res) => {
       data: filteredResult,
     });
   } catch (error) {
-    console.error('Error fetching featured properties:', error);
     res.status(500).json({
       message: 'Error fetching featured properties.',
       error: error.message,
@@ -3193,7 +3190,6 @@ router.get('/fetch-all-ppc-properties', async (req, res) => {
       data: filteredResult,
     });
   } catch (error) {
-    console.error('Error fetching featured properties:', error);
     res.status(500).json({
       message: 'Error fetching featured properties.',
       error: error.message,
@@ -3287,7 +3283,6 @@ router.get('/fetch-all-paid-plans', async (req, res) => {
       data: userPlansWithProperties,
     });
   } catch (error) {
-    console.error('Error fetching Paid plans and properties:', error);
     res.status(500).json({
       message: 'Error fetching Paid plans and properties.',
       error: error.message,
@@ -3313,7 +3308,6 @@ router.put('/delete-free-property/:ppcId', async (req, res) => {
 
     res.status(200).json({ message: 'Property marked as deleted successfully', property });
   } catch (error) {
-    console.error('Error deleting property:', error);
     res.status(500).json({ message: 'Internal server error', error: error.message });
   }
 });
@@ -3335,7 +3329,6 @@ router.put('/undo-delete-free-property/:ppcId', async (req, res) => {
 
     res.status(200).json({ message: 'Property restored successfully', property });
   } catch (error) {
-    console.error('Error restoring property:', error);
     res.status(500).json({ message: 'Internal server error', error: error.message });
   }
 });
@@ -3358,7 +3351,6 @@ router.put('/delete-free-property/:ppcId/:phoneNumber', async (req, res) => {
 
     res.status(200).json({ message: 'Property marked as deleted successfully', property });
   } catch (error) {
-    console.error('Error deleting property:', error);
     res.status(500).json({ message: 'Internal server error', error: error.message });
   }
 });
@@ -3380,7 +3372,6 @@ router.put('/undo-delete-free-property/:ppcId/:phoneNumber', async (req, res) =>
 
     res.status(200).json({ message: 'Property restored successfully', property });
   } catch (error) {
-    console.error('Error restoring property:', error);
     res.status(500).json({ message: 'Internal server error', error: error.message });
   }
 });
@@ -3400,7 +3391,6 @@ router.get('/fetch-all-datas', async (req, res) => {
         res.status(500).json({ message: 'Error fetching all user details.', error });
     }
 });
-
 
 
 
@@ -3434,6 +3424,8 @@ router.get("/fetch-all-properties", async (req, res) => {
   }
 });
 
+
+
 // Fetch properties from all Puducherry variants (case-insensitive)
 router.get("/fetch-Pudhucherry-properties", async (req, res) => {
   try {
@@ -3452,6 +3444,8 @@ router.get("/fetch-Pudhucherry-properties", async (req, res) => {
     res.status(500).json({ success: false, message: "Server error", error });
   }
 });
+
+
 
 
 
@@ -3526,7 +3520,8 @@ router.get('/fetch-active-users', async (req, res) => {
    : 'N/A';
 
 
-
+   
+    
     return {
       ...property._doc,
       required: isComplete ? "yes" : "no",
@@ -3551,13 +3546,13 @@ router.get('/fetch-active-users', async (req, res) => {
       users: filteredProperties,
     });
   } catch (error) {
-    console.error('Error fetching active user details:', error);
     res.status(500).json({
       message: 'Error fetching active user details.',
       error: error.message
     });
   }
 });
+
 
 
 
@@ -3634,7 +3629,6 @@ router.delete('/delete-ppcId-data', async (req, res) => {
 
     res.status(200).json({ message: 'User Permenent deleted successfully!', deletedUser: userToDelete });
   } catch (error) {
-    console.error("Delete error:", error);
     res.status(500).json({ message: 'Error deleting user.', error });
   }
 });
@@ -3675,49 +3669,6 @@ router.delete('/delete-data', async (req, res) => {
         res.status(500).json({ message: 'Error deleting user.', error });
     }
 });
-
-
-
-// router.put('/delete-datas', async (req, res) => {
-//   const { phoneNumber, ppcId } = req.query;
-
-//   if (!phoneNumber || !ppcId) {
-//       return res.status(400).json({ message: 'Both phone number and PPC-ID are required.' });
-//   }
-
-//   try {
-
-//       const query = { phoneNumber, ppcId };
-
-//       // Update status instead of deleting the record
-//       const updatedUser = await AddModel.findOneAndUpdate(
-//           query,
-//           { status: "delete", deletedBy: "Admin" }, 
-//           { new: true }
-//       );
-
-//       if (!updatedUser) {
-//           return res.status(404).json({ message: 'User not found.' });
-//       }
-
-
-//       res.status(200).json({ message: 'User marked as deleted successfully!', updatedUser });
-//   } catch (error) {
-//       res.status(500).json({ message: 'Error updating user status.', error });
-//   }
-// });
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -4042,7 +3993,6 @@ router.delete('/delete-all-properties', async (req, res) => {
     const result = await AddModel.deleteMany({}); // Deletes all documents in the collection
     res.status(200).json({ message: 'All properties deleted successfully.', deletedCount: result.deletedCount });
   } catch (error) {
-    console.error('Error deleting all properties:', error);
     res.status(500).json({ message: 'Error deleting all properties.' });
   }
 });
@@ -4400,13 +4350,13 @@ router.get('/properties/deleted', async (req, res) => {
       data: processedDeleted,
     });
   } catch (error) {
-    console.error('Error fetching deleted properties:', error);
     res.status(500).json({
       message: 'Error fetching deleted properties.',
       error: error.message,
     });
   }
 });
+
 
 
 
@@ -4474,13 +4424,15 @@ router.get('/properties/pending', async (req, res) => {
       users: incompleteUsers
     });
   } catch (error) {
-    console.error('Error fetching pending properties:', error);
     res.status(500).json({
       message: 'Error fetching pending properties.',
       error: error.message
     });
   }
 });
+
+
+
 
 router.get('/properties/pre-approved', async (req, res) => {
   try {
@@ -4539,14 +4491,12 @@ router.get('/properties/pre-approved', async (req, res) => {
       users: completeUsers
     });
   } catch (error) {
-    console.error('Error fetching pre-approved properties:', error);
     res.status(500).json({
       message: 'Error fetching pre-approved properties.',
       error: error.message
     });
   }
 });
-
 
 router.get('/approved-properties-count', async (req, res) => {
   try {
@@ -4555,39 +4505,12 @@ router.get('/approved-properties-count', async (req, res) => {
 
     res.status(200).json({ approvedProperties: count });
   } catch (error) {
-    console.error("Error fetching approved properties count:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
 
 module.exports = router;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

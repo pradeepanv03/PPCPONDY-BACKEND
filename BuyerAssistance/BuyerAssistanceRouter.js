@@ -200,9 +200,6 @@ router.get("/fetch-buyerAssistances", async (req, res) => {
 
 
 
-
-
-
 router.get("/get-buyerAssistance", async (req, res) => {
   const { phoneNumber } = req.query; // Extract phoneNumber from query
 
@@ -447,6 +444,7 @@ router.get("/get-buyer-id/:phoneNumber", async (req, res) => {
 
 
 
+
 router.post("/add-buyerAssistance", async (req, res) => {
   try {
     const { phoneNumber } = req.body;
@@ -653,8 +651,6 @@ router.post('/get-matched-property', async (req, res) => {
     return res.status(500).json({ success: false, message: "Server Error", error: error.message });
   }
 });
-
-
 
 
 
@@ -1500,6 +1496,7 @@ router.get("/fetch-matched-data-buyer", async (req, res) => {
 
 
 
+
 router.get("/fetch-owner-matched-properties", async (req, res) => {
   try {
     let { phoneNumber } = req.query;
@@ -1736,7 +1733,6 @@ router.get("/fetch-buyerAssistance-user", async (req, res) => {
 
 
 
-
 router.get("/expire-buyerAssistance", async (req, res) => {
   try {
     const buyerAssistanceList = await BuyerAssistance.find();
@@ -1746,7 +1742,24 @@ router.get("/expire-buyerAssistance", async (req, res) => {
       phoneNumber: { $in: phoneNumbers }
     });
 
-    const formatDate = (date) => 
+    // 🔍 Get latest follow-up per phoneNumber
+    const followUps = await FollowUp.aggregate([
+      { $match: { phoneNumber: { $in: phoneNumbers } } },
+      { $sort: { followupDate: -1 } },
+      {
+        $group: {
+          _id: "$phoneNumber",
+          adminName: { $first: "$adminName" }
+        }
+      }
+    ]);
+
+    const followUpMap = {};
+    followUps.forEach(f => {
+      followUpMap[f._id] = f.adminName;
+    });
+
+    const formatDate = (date) =>
       date ? new Date(date).toLocaleDateString("en-GB") : "N/A";
 
     const calculateExpiry = (startDate, durationDays) => {
@@ -1757,10 +1770,10 @@ router.get("/expire-buyerAssistance", async (req, res) => {
     };
 
     const today = new Date();
-    today.setHours(0, 0, 0, 0); // Normalize to start of day
+    today.setHours(0, 0, 0, 0);
     const tenDaysFromNow = new Date();
     tenDaysFromNow.setDate(today.getDate() + 10);
-    tenDaysFromNow.setHours(23, 59, 59, 999); // End of day
+    tenDaysFromNow.setHours(23, 59, 59, 999);
 
     const combinedData = buyerAssistanceList.map((ba) => {
       const plan = plans.find(p =>
@@ -1771,11 +1784,11 @@ router.get("/expire-buyerAssistance", async (req, res) => {
 
       const expiryDate = calculateExpiry(plan?.createdAt, plan?.durationDays);
       let expiryMessage = "No active plan";
-      
+
       if (expiryDate) {
         const timeDiff = expiryDate.getTime() - today.getTime();
         const daysRemaining = Math.ceil(timeDiff / (1000 * 60 * 60 * 24));
-        
+
         if (daysRemaining > 0) {
           expiryMessage = `Your plan expires in ${daysRemaining} ${daysRemaining === 1 ? 'day' : 'days'}`;
         } else if (daysRemaining === 0) {
@@ -1791,30 +1804,27 @@ router.get("/expire-buyerAssistance", async (req, res) => {
         planCreatedAt: formatDate(plan?.createdAt),
         planExpiry: expiryDate ? formatDate(expiryDate) : "N/A",
         expiryMessage,
-        planExpiryRaw: expiryDate // used for filtering
+        planExpiryRaw: expiryDate,
+        adminName: followUpMap[ba.phoneNumber] || "N/A"
       };
     });
 
-    // Filter entries where expiry is within the next 10 days or recently expired (7 days)
     const filteredData = combinedData.filter(entry => {
       if (!entry.planExpiryRaw) return false;
-      
+
       const expiryDate = new Date(entry.planExpiryRaw);
       const timeDiff = expiryDate.getTime() - today.getTime();
       const daysDifference = Math.ceil(timeDiff / (1000 * 60 * 60 * 24));
-      
-      // Include plans expiring in next 10 days or expired in last 7 days
+
       return daysDifference <= 10 && daysDifference >= -7;
     });
 
-    // Sort by days remaining (soonest first)
     filteredData.sort((a, b) => {
       const aDiff = a.planExpiryRaw ? a.planExpiryRaw.getTime() - today.getTime() : 0;
       const bDiff = b.planExpiryRaw ? b.planExpiryRaw.getTime() - today.getTime() : 0;
       return aDiff - bDiff;
     });
 
-    // Remove raw expiry from final output
     const finalData = filteredData.map(entry => {
       const { planExpiryRaw, ...rest } = entry;
       return rest;
@@ -1825,12 +1835,8 @@ router.get("/expire-buyerAssistance", async (req, res) => {
       message: "Buyer Assistance requests with expiring plans fetched successfully!",
       stats: {
         total: finalData.length,
-        expiringSoon: finalData.filter(d => 
-          d.expiryMessage.includes("expires in")
-        ).length,
-        expiredRecently: finalData.filter(d => 
-          d.expiryMessage.includes("expired")
-        ).length
+        expiringSoon: finalData.filter(d => d.expiryMessage.includes("expires in")).length,
+        expiredRecently: finalData.filter(d => d.expiryMessage.includes("expired")).length
       },
       data: finalData
     });
@@ -1843,6 +1849,7 @@ router.get("/expire-buyerAssistance", async (req, res) => {
     });
   }
 });
+
 
 
 
@@ -2115,7 +2122,6 @@ router.get("/fetch-buyerAssistance", async (req, res) => {
 
 
 
-
 // GET /buyerAssistance-pending-with-plan
 router.get("/fetch-buyerAssistance-pending", async (req, res) => {
   try {
@@ -2316,7 +2322,31 @@ router.delete("/delete-buyer-assistance/:id", async (req, res) => {
 
 
 
+// ✅ API to Undo Delete (Restore Buyer Assistance)
+router.put("/undo-delete-buyer-assistance/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
 
+    // ✅ Find and restore the deleted record
+    const restoredAssistance = await BuyerAssistance.findByIdAndUpdate(
+      id,
+      { isDeleted: false, deletedAt: null },
+      { new: true }
+    );
+
+    if (!restoredAssistance) {
+      return res.status(404).json({ message: "Buyer Assistance request not found" });
+    }
+
+    res.status(200).json({
+      message: "Buyer Assistance request restored successfully",
+      data: restoredAssistance,
+    });
+
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error });
+  }
+});
 
 // / API to Undo Delete (Restore Buyer Assistance by ba_id)
 router.put("/undo-delete-buyer-assistance/:ba_id", async (req, res) => {

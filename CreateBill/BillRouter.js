@@ -4,7 +4,6 @@ const Bill = require('../CreateBill/BillModel');
 const AddModel = require('../AddModel');
 
 
-
 router.post('/create-bill', async (req, res) => {
   try {
     const billData = req.body;
@@ -41,6 +40,7 @@ router.post('/create-bill', async (req, res) => {
     res.status(500).json({ success: false, message: 'Server Error', error: error.message });
   }
 });
+
 
 
 
@@ -113,7 +113,6 @@ router.get('/get-default-bill-data', async (req, res) => {
       success: true,
       data: {
         adminOffice: 'AUROBINDO', // Hardcoded for now, can make dynamic later
-        // adminName:'',    // Hardcoded for now, can make dynamic later
         billNo: nextBillNo,
         billDate: formattedDate,
       }

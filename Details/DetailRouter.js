@@ -635,8 +635,6 @@ router.get('/get-all-owners-and-buyers', async (req, res) => {
 
 
 
-
-
   router.get('/total-help-request-count', async (req, res) => {
     try {
       const result = await AddModel.aggregate([
@@ -1593,7 +1591,7 @@ router.post('/report-property', async (req, res) => {
     }
   });
   
-
+ 
 
 router.get('/property-reports-count', async (req, res) => {
     try {
@@ -2221,8 +2219,6 @@ router.delete('/delete-soldout/:ppcId', async (req, res) => {
         return res.status(500).json({ message: 'Internal Server Error', error: error.message });
     }
 });
-
-
 
 router.post("/add-favorite", async (req, res) => {
   const { phoneNumber, ppcId } = req.body;

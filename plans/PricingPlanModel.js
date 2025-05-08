@@ -3,9 +3,6 @@ const mongoose = require('mongoose');
 // Define the plan schema
 const PricingPlanSchema = new mongoose.Schema({
     // Phone number is unique and required for each plan
-    // phoneNumber: { 
-    //     type: [String], 
-    // },
     phoneNumber: {
         type: [String], // Array of strings
         validate: {

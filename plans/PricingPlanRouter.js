@@ -199,7 +199,6 @@ router.post("/select-plan", async (req, res) => {
 });
 
 
-
 router.get("/selected-plans", async (req, res) => {
     try {
         const selectedPlans = await PricingPlans.find({ phoneNumber: { $exists: true } });

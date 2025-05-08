@@ -101,16 +101,23 @@ router.get('/get-views-by-date', async (req, res) => {
 
 
 
-// Get all recorded views
+// Get all recorded views with userName and role, exclude phoneNumber
 router.get('/get-all-views', async (req, res) => {
     try {
-      const allViews = await UserInteraction.find().sort({ viewTime: -1 }); // sorted by newest first
+      const allViews = await UserInteraction.find({
+        userName: { $exists: true, $ne: null },
+        role: { $exists: true, $ne: null }
+      })
+      .sort({ viewTime: -1 })
+      .select('-phoneNumber'); // Exclude phoneNumber
+  
       res.status(200).json(allViews);
     } catch (error) {
       res.status(500).json({ message: 'Failed to fetch views', error: error.message });
     }
   });
-
+  
+  
   
 router.get('/get-all-views-grouped', async (req, res) => {
     try {
@@ -148,7 +155,6 @@ router.get('/get-all-views-grouped', async (req, res) => {
         res.status(500).json({ message: 'Failed to fetch data', error: error.message });
     }
 });
-
 
 
 router.get('/get-all-views-detailed', async (req, res) => {

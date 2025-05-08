@@ -1,9 +1,6 @@
 const mongoose = require("mongoose");
 
 
-
-
-
 const BuyerAssistanceSchema = new mongoose.Schema({
   ba_id: {
     type: Number,
@@ -82,13 +79,6 @@ ba_status: {
 
 
 module.exports = mongoose.model("BuyerAssistance", BuyerAssistanceSchema);
-
-
-
-
-
-
-
 
 
 
