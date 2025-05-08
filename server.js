@@ -43,8 +43,8 @@ const mongoURI = process.env.MONGO_URI;
 const secretKey = process.env.SECRET_KEY;
 
 mongoose.connect(mongoURI)
-  .then(() => console.log("Database connected successfully"))
-  .catch((err) => console.error("Database connection failed:", err));
+.then(() => {})
+.catch(() => {});
 
 
 app.use(cors());
