@@ -343,6 +343,7 @@ const AddSchema = new mongoose.Schema({
   city: { type: String },
   state: { type: String },
   district: { type: String },
+  pinCode: { type: Number },
   area: { type: String },
   streetName: { type: String },
   doorNumber: { type: String },
